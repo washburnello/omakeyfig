@@ -138,7 +138,16 @@ class KeyCapture(Static, can_focus=True):
 
 
 class KeyWidget(Static):
-    DEFAULT_CSS = "KeyWidget { height: 1; margin: 0; padding: 0; text-align: center; }"
+    DEFAULT_CSS = """
+    KeyWidget {
+        height: 3;
+        margin: 0;
+        padding: 0;
+        text-align: center;
+        content-align: center middle;
+        border: solid $primary;
+    }
+    """
 
     def __init__(self, kd: KeyDef, cells: int) -> None:
         super().__init__(short_label(kd))
@@ -158,7 +167,7 @@ class KeyboardTester(Vertical):
 
     DEFAULT_CSS = """
     KeyboardTester { height: auto; overflow-x: auto; }
-    KeyboardTester .kb-row { height: 1; margin: 0; padding: 0; }
+    KeyboardTester .kb-row { height: 3; margin: 0; padding: 0; }
     """
 
     LED_MODES = ["Off", "Static", "Breathing", "Rainbow"]

@@ -54,6 +54,7 @@ def test_clear_resets_indicators():
             btn = app.query_one("#btn-clear", Button)
             btn.scroll_visible()
             await pilot.pause()
+            await pilot.pause()
             await pilot.click("#btn-clear")
             await pilot.pause()
             assert board.pressed == set()
@@ -62,7 +63,7 @@ def test_clear_resets_indicators():
 
 
 def test_board_rows_are_flush():
-    """Rows must sit directly adjacent (height 1, contiguous) — no gaps."""
+    """Bordered rows must sit directly adjacent — no blank lines between."""
     async def scenario():
         app = OmakeyfigApp()
         async with app.run_test() as pilot:
@@ -74,10 +75,10 @@ def test_board_rows_are_flush():
             rows = list(app.query(".kb-row"))
             assert len(rows) == 5
             for row in rows:
-                assert row.region.height == 1, row.region
+                assert row.region.height == 3, row.region
             ys = [row.region.y for row in rows]
             for a, b in zip(ys, ys[1:]):
-                assert b - a == 1, ys
+                assert b - a == 3, ys
     _run(scenario())
 
 
