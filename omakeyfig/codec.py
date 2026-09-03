@@ -24,47 +24,75 @@ N_BUFFERS = 9
 BUFFER_LEN = 65  # includes the report-ID byte
 KEY_BYTES = 4
 
+# Per-buffer framing (Rangoli + KludgeKnight, verified on S70):
+#   byte 0: report ID (0x0a)
+#   byte 1: total buffer count (9)
+#   byte 2: 1-based sequence number
+#   bytes 3-4 (buffer 0 only): 0x01, 0xf8
+# Key space is a flat 9*65 = 585-byte area striped across the payloads:
+# buffer 0 takes bytes [0:60], buffers 1..8 take 62 bytes each starting at
+# payload byte 3. Key slot i lives at space offset i*4.
+SEQ_COUNT_BYTE = 1
+SEQ_NUM_BYTE = 2
 HEADER_AT = (3, 4)
 HEADER_VALS = (0x01, 0xF8)
-FIRST_BUF_DATA_START = 5  # key space starts at buffer byte 5 in buffer 0
+FIRST_BUF_DATA_START = 5
+OTHER_BUF_DATA_START = 3
 
-# Usable key-space bytes: 60 in buffer 0 + 8 * 64.
-SPACE_LEN = (BUFFER_LEN - FIRST_BUF_DATA_START) + (N_BUFFERS - 1) * (BUFFER_LEN - 1)
-MAX_KEYS = SPACE_LEN // KEY_BYTES  # 143
+SPACE_LEN = N_BUFFERS * BUFFER_LEN  # 585
+MAX_KEYS = SPACE_LEN // KEY_BYTES  # 146
+
+
+def encode_keycode(code: int) -> bytes:
+    """Encode one firmware code into its 4-byte slot (big-endian placement).
+
+    Direct port of Rangoli/KludgeKnight setBufferKey: the most significant
+    byte goes first; unused leading bytes are zero.
+    """
+    if not 0 <= code <= 0xFFFFFFFF:
+        raise ValueError(f"firmware code {code:#x} out of 32-bit range")
+    if code >= 0x01000000:
+        return bytes(((code >> 24) & 0xFF, (code >> 16) & 0xFF,
+                      (code >> 8) & 0xFF, code & 0xFF))
+    if code >= 0x010000:
+        return bytes((0x00, (code >> 16) & 0xFF, (code >> 8) & 0xFF, code & 0xFF))
+    if code >= 0x0100:
+        return bytes((0x00, 0x00, (code >> 8) & 0xFF, code & 0xFF))
+    return bytes((0x00, 0x00, 0x00, code & 0xFF))
 
 
 def encode_keymap(mappings: dict[int, int], n_keys: int) -> list[bytes]:
-    """Encode {key_index: firmware_code} into 9 x 65-byte feature reports.
+    """Encode {slot: firmware_code} into 9 x 65-byte feature reports.
 
-    Missing indices encode as firmware code 0. Raises ValueError if n_keys
-    exceeds capacity.
+    Faithful port of KludgeKnight BufferCodec.encode (itself ported from
+    Rangoli): flat 585-byte space, per-buffer framing, big-endian key slots.
+    Missing slots encode as firmware code 0.
     """
     if n_keys > MAX_KEYS:
         raise ValueError(f"n_keys={n_keys} exceeds capacity {MAX_KEYS}")
     space = bytearray(SPACE_LEN)
-    for idx, code in mappings.items():
-        if not 0 <= idx < n_keys:
-            raise ValueError(f"key index {idx} out of range for n_keys={n_keys}")
-        if not 0 <= code <= 0xFFFFFFFF:
-            raise ValueError(f"firmware code {code:#x} out of 32-bit range")
-        off = idx * KEY_BYTES
-        space[off : off + KEY_BYTES] = code.to_bytes(4, "little")
+    for slot, code in mappings.items():
+        if not 0 <= slot < n_keys:
+            raise ValueError(f"key slot {slot} out of range for n_keys={n_keys}")
+        off = slot * KEY_BYTES
+        space[off : off + KEY_BYTES] = encode_keycode(code)
 
     buffers: list[bytes] = []
     cursor = 0
-    for b in range(N_BUFFERS):
+    for i in range(N_BUFFERS):
         buf = bytearray(BUFFER_LEN)
         buf[0] = REPORT_ID
-        if b == 0:
+        buf[SEQ_COUNT_BYTE] = N_BUFFERS
+        buf[SEQ_NUM_BYTE] = i + 1
+        if i == 0:
             buf[HEADER_AT[0]] = HEADER_VALS[0]
             buf[HEADER_AT[1]] = HEADER_VALS[1]
-            chunk_len = BUFFER_LEN - FIRST_BUF_DATA_START
-            buf[FIRST_BUF_DATA_START:] = space[cursor : cursor + chunk_len]
-            cursor += chunk_len
+            start = FIRST_BUF_DATA_START
         else:
-            chunk_len = BUFFER_LEN - 1
-            buf[1:] = space[cursor : cursor + chunk_len]
-            cursor += chunk_len
+            start = OTHER_BUF_DATA_START
+        end = BUFFER_LEN
+        buf[start:end] = space[cursor : cursor + (end - start)]
+        cursor += end - start
         buffers.append(bytes(buf))
     return buffers
 
@@ -74,19 +102,21 @@ def decode_keymap(buffers: list[bytes], n_keys: int) -> dict[int, int]:
     if len(buffers) != N_BUFFERS:
         raise ValueError(f"expected {N_BUFFERS} buffers, got {len(buffers)}")
     space = bytearray()
-    for b, buf in enumerate(buffers):
+    for i, buf in enumerate(buffers):
         if len(buf) != BUFFER_LEN:
-            raise ValueError(f"buffer {b}: expected {BUFFER_LEN} bytes, got {len(buf)}")
+            raise ValueError(f"buffer {i}: expected {BUFFER_LEN} bytes, got {len(buf)}")
         if buf[0] != REPORT_ID:
-            raise ValueError(f"buffer {b}: bad report ID {buf[0]:#x}")
-        if b == 0:
+            raise ValueError(f"buffer {i}: bad report ID {buf[0]:#x}")
+        if buf[SEQ_COUNT_BYTE] != N_BUFFERS or buf[SEQ_NUM_BYTE] != i + 1:
+            raise ValueError(f"buffer {i}: bad framing bytes")
+        if i == 0:
             if (buf[HEADER_AT[0]], buf[HEADER_AT[1]]) != HEADER_VALS:
                 raise ValueError("buffer 0: missing header bytes 0x01 0xf8")
             space += buf[FIRST_BUF_DATA_START:]
         else:
-            space += buf[1:]
+            space += buf[OTHER_BUF_DATA_START:]
     out: dict[int, int] = {}
-    for idx in range(n_keys):
-        off = idx * KEY_BYTES
-        out[idx] = int.from_bytes(space[off : off + KEY_BYTES], "little")
+    for slot in range(n_keys):
+        off = slot * KEY_BYTES
+        out[slot] = int.from_bytes(space[off : off + KEY_BYTES], "big")
     return out

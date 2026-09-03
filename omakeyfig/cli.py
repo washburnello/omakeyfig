@@ -66,10 +66,35 @@ def cmd_apply_theme(args) -> int:
     color = omarchy.keyboard_accent()
     state = lighting.LightingState(color=color)
     desc = lighting.describe(state)
+    buf = lighting.build_lighting_report(state)
     if args.dry_run:
         print(f"dry-run: would apply theme lighting: {desc}")
+        print(f"  bytes: {buf[:14].hex()}...(65B)")
         return 0
-    print(f"Theme lighting: {desc} (byte-level push lands after HW validation)")
+    dev = hid_layer.RKDevice(VID_ROYAL_KLUDGE, PID_S70)
+    try:
+        dev.write_feature_buffers([buf])
+    finally:
+        dev.close()
+    print(f"Theme lighting applied: {desc}")
+    return 0
+
+
+def cmd_light(args) -> int:
+    state = lighting.LightingState(effect=args.effect, brightness=args.brightness,
+                                   speed=args.speed, color=args.color,
+                                   random=args.random, sleep=args.sleep)
+    buf = lighting.build_lighting_report(state)
+    if args.dry_run:
+        print(f"dry-run: {lighting.describe(state)}")
+        print(f"  bytes: {buf[:14].hex()}...(65B)")
+        return 0
+    dev = hid_layer.RKDevice(VID_ROYAL_KLUDGE, PID_S70)
+    try:
+        dev.write_feature_buffers([buf])
+    finally:
+        dev.close()
+    print(f"Lighting applied: {lighting.describe(state)}")
     return 0
 
 
@@ -103,6 +128,15 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--dry-run", action="store_true")
     t.add_argument("--from-omarchy", action="store_true")
     t.set_defaults(fn=cmd_apply_theme)
+    li = sub.add_parser("light", help="Set keyboard-wide lighting")
+    li.add_argument("--effect", default="Steady", choices=lighting.EFFECTS)
+    li.add_argument("--brightness", type=int, default=5)
+    li.add_argument("--speed", type=int, default=5)
+    li.add_argument("--color", default="#faa968")
+    li.add_argument("--random", action="store_true")
+    li.add_argument("--sleep", type=int, default=5)
+    li.add_argument("--dry-run", action="store_true")
+    li.set_defaults(fn=cmd_light)
     sv = sub.add_parser("save-profile", help="Snapshot default layout to a profile")
     sv.add_argument("name")
     sv.add_argument("--pid", default=hex(PID_S70))

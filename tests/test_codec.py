@@ -1,12 +1,24 @@
 from omakeyfig import codec
 
 
-def test_encode_shape():
+def test_encode_shape_and_framing():
     bufs = codec.encode_keymap({0: 0x0400, 1: 0x0500}, 74)
     assert len(bufs) == codec.N_BUFFERS
     assert all(len(b) == codec.BUFFER_LEN for b in bufs)
-    assert all(b[0] == codec.REPORT_ID for b in bufs)
+    for i, b in enumerate(bufs):
+        assert b[0] == codec.REPORT_ID
+        assert b[1] == codec.N_BUFFERS
+        assert b[2] == i + 1
     assert (bufs[0][3], bufs[0][4]) == (0x01, 0xF8)
+
+
+def test_big_endian_key_slots():
+    # A key (HID 0x04 -> fw 0x0400) must land big-endian: 00 00 04 00.
+    bufs = codec.encode_keymap({0: 0x0400}, 74)
+    assert bytes(bufs[0][5:9]) == bytes((0x00, 0x00, 0x04, 0x00))
+    # Modifier bitflag 0x010000 -> 00 01 00 00.
+    bufs = codec.encode_keymap({0: 0x010000}, 74)
+    assert bytes(bufs[0][5:9]) == bytes((0x00, 0x01, 0x00, 0x00))
 
 
 def test_round_trip():
