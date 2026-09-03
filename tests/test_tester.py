@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import ListView
+from textual.widgets import Button, ListView, Select
 
 from omakeyfig.app import OmakeyfigApp
 from omakeyfig.keyboard_widget import KeyboardTester
@@ -25,7 +25,7 @@ def test_key_tester_records_presses():
                 await pilot.press("down")
             await pilot.press("enter")
             await pilot.pause()
-            assert app._tester is True
+            assert app._screen == "tester"
             await pilot.press("q", "z")
             await pilot.pause()
             board = app.query_one("#kb", KeyboardTester)
@@ -79,6 +79,37 @@ def test_board_rows_are_flush():
             ys = [row.region.y for row in rows]
             for a, b in zip(ys, ys[1:]):
                 assert b - a == 3, ys
+    _run(scenario())
+
+
+def test_lighting_screen_preview_no_hardware():
+    """Lighting screen previews without touching hardware."""
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = app.query_one("#sections", ListView)
+            lv.focus()
+            await pilot.pause()
+            await pilot.press("down", "down")
+            await pilot.press("enter")
+            await pilot.pause()
+            assert app._screen == "lighting"
+            board = app.query_one("#kb", KeyboardTester)
+            # Default effect Steady previews as Static on open.
+            assert board.led_mode == "Static"
+            sel = app.query_one("#led-effect", Select)
+            sel.value = "Rainbow"
+            await pilot.pause()
+            assert board.led_mode == "Rainbow"
+            # Steppers clamp 0..10.
+            assert app.light_b == 5
+            plus = app.query_one("#btn-b-plus", Button)
+            plus.scroll_visible()
+            await pilot.pause()
+            await pilot.pause()
+            await pilot.click("#btn-b-plus")
+            await pilot.pause()
+            assert app.light_b == 6
     _run(scenario())
 
 

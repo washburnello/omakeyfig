@@ -50,10 +50,10 @@ omakeyfig tui                     # Textual TUI
   S70. A visual board (physical arrangement from the S70 layout data) lights
   each pressed key white and logs the OS key event + firmware slot(s); both
   halves of the split spacebar light together, as do L/R modifier pairs.
-  **Clear** resets all indicators. The **LED preview** selector paints the
-  board to approximate the hardware effect (Off / Static / Breathing /
-  Rainbow, seeded with your Omarchy accent), and **Push to keyboard** sends
-  that effect to the real board. Leave via **Back**.
+  **Clear** resets all indicators. Leave via **Back**.
+- **Lighting**: effect picker (all 21 RGB effects), hex color (defaults to
+  your Omarchy accent), brightness / speed / sleep steppers, a live board
+  preview, and **Push to keyboard** to send it to the real board.
 
 Desktop install (menu entry + PATH shim):
 
