@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=omakeyfig
+Comment=RK-S70 keyboard customizer + key tester (unofficial)
+# Requires `omakeyfig` on PATH (or edit Exec to point at your venv).
+Exec=omakeyfig tui
+Terminal=true
+Type=Application
+Categories=Utility;Settings;
+Keywords=keyboard;royal kludge;rk-s70;remap;rgb;

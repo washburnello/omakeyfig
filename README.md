@@ -34,11 +34,31 @@ sudo cp udev/60-rk.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rul
 
 ```bash
 omakeyfig status                  # list connected RK boards (expect 258a:0220 for the S70)
+omakeyfig tui                     # Textual TUI (includes the Key tester screen)
 omakeyfig write-map --dry-run     # validate codec without touching hardware
 omakeyfig save-profile default    # snapshot defaults
 omakeyfig write-map --profile default --yes   # real write (backs up first in later versions)
 omakeyfig apply-theme --dry-run   # preview Omarchy accent lighting
 omakeyfig tui                     # Textual TUI
+```
+
+## Opening the app
+
+- **Omarchy menu** (`Super + Alt + Space`): search for **omakeyfig**.
+- **Terminal**: `omakeyfig tui` (the installer below puts it on PATH).
+- **Key tester**: open the TUI → select **Key tester** → press keys on the
+  S70. Each press shows the Textual key name + character the OS delivered,
+  with a scrollable history. Leave via the **Back** button.
+
+Desktop install (menu entry + PATH shim):
+
+```bash
+VENV="$PWD/.venv/bin/python"
+printf '#!/bin/sh\nexec "%s" -m omakeyfig.cli "$@"\n' "$VENV" > ~/.local/bin/omakeyfig
+chmod +x ~/.local/bin/omakeyfig
+sed "s|^Exec=.*|Exec=$HOME/.local/bin/omakeyfig tui|" desktop/omakeyfig.desktop \
+  > ~/.local/share/applications/omakeyfig.desktop
+# ensure ~/.local/bin is on PATH, then `omakeyfig tui` works anywhere
 ```
 
 ## Omarchy extras
