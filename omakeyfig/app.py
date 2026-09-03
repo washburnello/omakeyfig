@@ -3,30 +3,29 @@
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
-from textual.widgets import Button, Footer, Header, Label, ListItem, ListView, RichLog, Static
+from textual.widgets import Button, Footer, Header, Label, ListItem, ListView, RichLog, Select, Static
 
-from omakeyfig import omarchy
-
-
-class KeyCapture(Static, can_focus=True):
-    """Focusable display that consumes no keys itself, so every keypress
-    bubbles up to the app handler (except app-level bindings)."""
-
-    DEFAULT_CSS = "KeyCapture { height: 5; content-align: center middle; border: solid $primary; }"
+from omakeyfig import hid_layer, lighting, omarchy
+from omakeyfig.keyboard_widget import KeyboardTester, KeyCapture, find_slots
+from omakeyfig.layouts import load_layout
 
 
-class TesterScreen(Vertical):
+class TesterScreen(VerticalScroll):
     """Live keypress tester: press keys on the S70, see what the OS delivers."""
 
     def compose(self) -> ComposeResult:
         yield Label("Key tester — press keys on the keyboard", classes="panel-title")
         yield KeyCapture("… (press any key)", id="capture")
-        yield RichLog(id="keylog", highlight=True, max_lines=200)
+        yield KeyboardTester(load_layout(0x0220), omarchy.keyboard_accent())
         with Horizontal():
+            yield Select([(m, m) for m in KeyboardTester.LED_MODES],
+                         value="Off", id="led-mode", prompt="LED preview")
+            yield Button("Push to keyboard", id="btn-push")
             yield Button("Clear", id="btn-clear")
             yield Button("Back", id="btn-back")
+        yield RichLog(id="keylog", highlight=True, max_lines=200)
 
 
 class SectionBack(Message):
@@ -106,15 +105,28 @@ class OmakeyfigApp(App):
         try:
             cap = self.query_one("#capture", KeyCapture)
             log = self.query_one("#keylog", RichLog)
+            board = self.query_one("#kb", KeyboardTester)
         except Exception:
             return
         shown = repr(character) if character else "—"
         cap.update(f"[bold]{key}[/bold]  char={shown}")
-        log.write(f"key={key} char={shown}")
+        slots = find_slots(board.keys, key, character)
+        if slots:
+            board.mark_pressed(slots)
+            log.write(f"key={key} char={shown} -> slot(s) {slots}")
+        else:
+            log.write(f"key={key} char={shown} (no board match)")
 
     async def on_key(self, event) -> None:
         if self._tester and event.key not in ("tab", "shift+tab"):
             self.record_key(event.key, event.character)
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "led-mode" and self._tester:
+            try:
+                self.query_one("#kb", KeyboardTester).set_led_mode(str(event.value))
+            except Exception:
+                pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-back":
@@ -125,8 +137,28 @@ class OmakeyfigApp(App):
             try:
                 self.query_one("#keylog", RichLog).clear()
                 self.query_one("#capture", KeyCapture).update("… (press any key)")
+                self.query_one("#kb", KeyboardTester).clear_pressed()
             except Exception:
                 pass
+            return
+        if event.button.id == "btn-push":
+            try:
+                log = self.query_one("#keylog", RichLog)
+                board = self.query_one("#kb", KeyboardTester)
+            except Exception:
+                return
+            effect = {"Static": "Steady", "Breathing": "Breathing",
+                      "Rainbow": "Rainbow", "Off": "Steady"}[board.led_mode]
+            state = lighting.LightingState(effect=effect, color=board.accent)
+            try:
+                dev = hid_layer.RKDevice()
+                try:
+                    dev.write_feature_buffers([lighting.build_lighting_report(state)])
+                finally:
+                    dev.close()
+                log.write(f"pushed to keyboard: {lighting.describe(state)}")
+            except Exception as e:
+                log.write(f"push failed: {e}")
             return
         from omakeyfig import cli as _cli
         try:

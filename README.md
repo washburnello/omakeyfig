@@ -47,8 +47,13 @@ omakeyfig tui                     # Textual TUI
 - **Omarchy menu** (`Super + Alt + Space`): search for **omakeyfig**.
 - **Terminal**: `omakeyfig tui` (the installer below puts it on PATH).
 - **Key tester**: open the TUI → select **Key tester** → press keys on the
-  S70. Each press shows the Textual key name + character the OS delivered,
-  with a scrollable history. Leave via the **Back** button.
+  S70. A visual board (physical arrangement from the S70 layout data) lights
+  each pressed key white and logs the OS key event + firmware slot(s); both
+  halves of the split spacebar light together, as do L/R modifier pairs.
+  **Clear** resets all indicators. The **LED preview** selector paints the
+  board to approximate the hardware effect (Off / Static / Breathing /
+  Rainbow, seeded with your Omarchy accent), and **Push to keyboard** sends
+  that effect to the real board. Leave via **Back**.
 
 Desktop install (menu entry + PATH shim):
 
