@@ -24,6 +24,28 @@ from omakeyfig.layouts import KeyDef
 PX_PER_CELL = 9
 KEY_HEIGHT = 3
 
+# Fn-layer legends by firmware slot. Sources: user-verified (PgUp->Pause,
+# PgDn->End), S70 manual (Fn+A Windows mode, Fn+S Mac mode), S70 review
+# (Fn+| color presets, Fn+arrows brightness/speed), RK-standard number row
+# (Fn+1..= -> F1-F12). Everything else is None ("?" in the UI) until
+# confirmed with the key tester: open the tester, hold physical Fn, press
+# a key, and read what the OS receives.
+FN_LAYER: dict[int, str] = {
+    # number row -> F1..F12
+    13: "F1", 19: "F2", 25: "F3", 31: "F4", 37: "F5", 43: "F6",
+    55: "F7", 61: "F8", 67: "F9", 73: "F10", 79: "F11", 85: "F12",
+    15: "Win", 21: "Mac",       # Fn+A Windows mode, Fn+S Mac mode
+    98: "Ins",                  # Fn+Delete -> Insert (manual lists Insert)
+    99: "Pause", 100: "End",    # user-verified
+    92: "Color",                # Fn+| cycles color presets
+    94: "Brt+", 95: "Brt-",     # Fn+Up/Down brightness
+    89: "Spd◀", 101: "Spd▶",    # Fn+Left/Right animation speed/direction
+}
+
+
+def fn_legend(slot: int) -> str | None:
+    return FN_LAYER.get(slot)
+
 # US-shifted symbols map back to their base key for highlight purposes.
 SHIFTED = {
     "!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6",
@@ -152,7 +174,22 @@ class KeyWidget(Static):
     def __init__(self, kd: KeyDef, cells: int) -> None:
         super().__init__(short_label(kd))
         self.slot = kd.slot
+        self.base_label = short_label(kd)
+        self.shown_label = self.base_label
         self.styles.width = cells
+
+    def set_fn_view(self, on: bool) -> None:
+        if not on:
+            self.shown_label = self.base_label
+            self.update(self.base_label)
+            return
+        legend = fn_legend(self.slot)
+        if legend is None:
+            self.shown_label = "?"
+            self.update("[dim]?[/dim]")
+        else:
+            self.shown_label = legend
+            self.update(f"[bold]{legend}[/bold]")
 
     def on_click(self) -> None:
         parent = self.parent
@@ -178,6 +215,7 @@ class KeyboardTester(Vertical):
         self.accent = accent
         self.pressed: set[int] = set()
         self.led_mode = "Off"
+        self.fn_view = False
         self.by_slot: dict[int, KeyWidget] = {}
         self._t0 = time.monotonic()
         self._timer = None
@@ -224,6 +262,12 @@ class KeyboardTester(Vertical):
     def clear_pressed(self) -> None:
         self.pressed.clear()
         self._paint()
+
+    # -- Fn-layer view --------------------------------------------------------
+    def set_fn_view(self, on: bool) -> None:
+        self.fn_view = on
+        for w in self.by_slot.values():
+            w.set_fn_view(on)
 
     # -- LED preview ---------------------------------------------------------
     def set_led_mode(self, mode: str) -> None:

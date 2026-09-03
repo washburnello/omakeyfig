@@ -23,6 +23,7 @@ class TesterScreen(VerticalScroll):
         yield KeyCapture("… (press any key)", id="capture")
         yield KeyboardTester(load_layout(0x0220), omarchy.keyboard_accent())
         with Horizontal():
+            yield Button("Fn", id="btn-fn")
             yield Button("Clear", id="btn-clear")
             yield Button("Back", id="btn-back")
         yield RichLog(id="keylog", highlight=True, max_lines=200)
@@ -57,6 +58,7 @@ class LightingScreen(VerticalScroll):
             yield Button("+", id="btn-z-plus")
         yield KeyboardTester(load_layout(0x0220), accent)
         with Horizontal():
+            yield Button("Fn", id="btn-fn")
             yield Button("Push to keyboard", id="btn-push")
             yield Button("Back", id="btn-back")
         yield Static("", id="light-status")
@@ -255,6 +257,14 @@ class OmakeyfigApp(App):
             return
         if bid == "btn-push":
             self.push_lighting()
+            return
+        if bid == "btn-fn":
+            try:
+                board = self.query_one("#kb", KeyboardTester)
+            except Exception:
+                return
+            board.set_fn_view(not board.fn_view)
+            event.button.variant = "success" if board.fn_view else "default"
             return
         steps = {"btn-b-minus": ("light_b", -1), "btn-b-plus": ("light_b", 1),
                  "btn-s-minus": ("light_s", -1), "btn-s-plus": ("light_s", 1),

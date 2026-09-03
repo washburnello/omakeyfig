@@ -129,3 +129,32 @@ def test_led_mode_switch():
             w = board.by_slot[14]
             assert str(w.styles.background) != board.base_bg
     _run(scenario())
+
+
+def test_fn_toggle_swaps_labels():
+    """Fn button swaps board labels to Fn legends and back."""
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = await _open_tester(app)
+            for _ in range(5):
+                await pilot.press("down")
+            await pilot.press("enter")
+            await pilot.pause()
+            board = app.query_one("#kb", KeyboardTester)
+            assert board.fn_view is False
+            assert board.by_slot[13].shown_label == "1"
+            from textual.widgets import Button
+            fn = app.query_one("#btn-fn", Button)
+            fn.focus()
+            await pilot.pause(0.4)
+            await pilot.press("enter")
+            await pilot.pause(0.4)
+            assert board.fn_view is True
+            assert board.by_slot[13].shown_label == "F1"
+            assert board.by_slot[14].shown_label == "?"
+            await pilot.press("enter")
+            await pilot.pause(0.4)
+            assert board.fn_view is False
+            assert board.by_slot[13].shown_label == "1"
+    _run(scenario())

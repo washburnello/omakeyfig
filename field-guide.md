@@ -92,6 +92,24 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
 `washburnello-restore` profile's `unresolved_macros` equivalent — see
 `rkf.py` output. Board currently has FACTORY codes in these slots.
 
+## Fn layer (fixed firmware table — NOT writable)
+
+- The Fn layer is a second, firmware-fixed table keyed by physical key/slot,
+  independent of the base map. Proof: after remapping base PgUp->Home,
+  Fn+PgUp still emits Pause. The official app cannot customize it either:
+  Profile1.rkf stores exactly 74 base-layer records and no Fn section.
+- Consequence: omakeyfig can VISUALIZE the Fn layer but not rewrite it.
+  `keyboard_widget.FN_LAYER` holds slot -> legend; unknown slots render "?".
+  Sources: user-verified (PgUp->Pause, PgDn->End), S70 manual (Fn+A Win
+  mode, Fn+S Mac mode), S70 review (Fn+| color, Fn+arrows brightness/speed),
+  RK-standard number row (Fn+1..= -> F1-F12).
+- UI: "Fn" toggle button in tester + lighting screens swaps labels
+  (sub-rows were rejected: they double the 15-line board to 30).
+- Unknown legends are completed empirically: open the tester, hold physical
+  Fn, press keys, read what the OS receives.
+- Workaround for "Fn+PgUp should be PgUp": OS-level remap of the Pause key
+  (e.g. keyd/Hyprland maps Pause -> PgUp). Mention, don't implement here.
+
 ## Past bugs (do not reintroduce)
 
 1. Positional slots: mapping list position 0..73 instead of KB.ini slots
@@ -102,6 +120,8 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
 4. hidapi open fails on this board -> raw hidraw backend.
 5. `hid.enumerate` paths (`5-3.2:1.1`) are NOT device nodes; map interfaces
    via sysfs parent dir, not string matching on enumerate paths.
+6. Textual Pilot tests: Button swallows re-presses inside its active-effect
+   window (~0.2s). Use `await pilot.pause(0.4)` around button activations.
 
 ## Omarchy integration
 

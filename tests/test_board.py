@@ -39,3 +39,14 @@ def test_find_slots_special():
     assert find_slots(keys, "shift", None) == sorted(find_slots(keys, "shift", None))
     assert set(find_slots(keys, "shift", None)) == {10, 88}
     assert find_slots(keys, "left", None) == [89]
+
+
+def test_fn_layer_legends():
+    from omakeyfig.keyboard_widget import fn_legend
+    assert fn_legend(13) == "F1"    # Fn+1
+    assert fn_legend(85) == "F12"   # Fn+=
+    assert fn_legend(99) == "Pause"  # user-verified
+    assert fn_legend(100) == "End"   # user-verified
+    assert fn_legend(94) == "Brt+"
+    assert fn_legend(14) is None     # Q: unknown until tester-confirmed
+    assert fn_legend(71) is None     # Fn itself has no Fn legend
