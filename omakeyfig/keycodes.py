@@ -1,0 +1,96 @@
+"""Windows-VK to RK firmware-code translation + HID usage table.
+
+Firmware encoding (documented via KludgeKnight USB-capture analysis):
+- Regular keys: USB HID usage ID << 8 (e.g. A = 0x04 -> 0x0400).
+- Left modifiers:  Ctrl 0x010000, Shift 0x020000, Alt 0x040000, Win 0x080000.
+- Right modifiers: Ctrl 0x100000, Shift 0x200000, Alt 0x400000, Win 0x800000.
+- Fn key: 0xB000.
+"""
+
+# --- Modifier firmware codes -------------------------------------------------
+FN_CODE = 0xB000
+MOD_LEFT = {"ctrl": 0x010000, "shift": 0x020000, "alt": 0x040000, "win": 0x080000}
+MOD_RIGHT = {"ctrl": 0x100000, "shift": 0x200000, "alt": 0x400000, "win": 0x800000}
+
+# --- Windows VK -> USB HID usage (covers every VK used by the S70 KB.ini) ---
+VK_TO_HID: dict[int, int] = {
+    0x1B: 0x29,  # Esc
+    0xC0: 0x35,  # `~
+    0x21: 0x4B,  # PgUp
+    0x2E: 0x4C,  # Delete
+    0x31: 0x1E, 0x32: 0x1F, 0x33: 0x20, 0x34: 0x21, 0x35: 0x22,
+    0x36: 0x23, 0x37: 0x24, 0x38: 0x25, 0x39: 0x26, 0x30: 0x27,
+    0xBD: 0x2D,  # -_
+    0xBB: 0x2E,  # =+
+    0x08: 0x2A,  # Backspace
+    0x09: 0x2B,  # Tab
+    0x51: 0x14, 0x57: 0x1D, 0x45: 0x08, 0x52: 0x15, 0x54: 0x17,
+    0x59: 0x1C, 0x55: 0x18, 0x49: 0x0C, 0x4F: 0x12, 0x50: 0x13,
+    0xDB: 0x2F, 0xDD: 0x30, 0xDC: 0x31,  # [{ ]} \|
+    0x22: 0x4E,  # PgDn
+    0x14: 0x39,  # CapsLock
+    0x41: 0x04, 0x53: 0x16, 0x44: 0x07, 0x46: 0x09, 0x47: 0x0A,
+    0x48: 0x0B, 0x4A: 0x0D, 0x4B: 0x0E, 0x4C: 0x0F,
+    0xBA: 0x33,  # ;:
+    0xDE: 0x34,  # '"
+    0x0D: 0x28,  # Enter
+    0x5A: 0x1A, 0x58: 0x1B, 0x43: 0x06, 0x56: 0x19, 0x42: 0x05,
+    0x4E: 0x11, 0x4D: 0x10,
+    0xBC: 0x36, 0xBE: 0x37, 0xBF: 0x38,  # ,< .> /?
+    0xA2: 0xE0,  # LCtrl
+    0x5B: 0xE3,  # LWin
+    0xA4: 0xE2,  # LAlt
+    0x20: 0x2C,  # Space
+    0xA5: 0xE6,  # RAlt
+    0xA3: 0xE4,  # RCtrl
+    0x25: 0x50, 0x28: 0x51, 0x27: 0x4F, 0x26: 0x52,  # arrows
+    0xA0: 0xE1,  # LShift
+    0xA1: 0xE5,  # RShift
+    0xE0: 0x2C,  # second Space (split spacebar, same HID as Space)
+    0xFA: 0x00,  # FN placeholder -> mapped to FN_CODE below
+    # Macro keys (M1..M5 vendor VKs; kept as firmware passthrough markers)
+    0xD9: 0x00, 0xB9: 0x00, 0xC6: 0x00, 0xB8: 0x00, 0xC7: 0x00,
+}
+
+# Macro-key VKs on the S70 (M1..M5, left column). Values are vendor-specific;
+# the firmware treats them as macro slots, so we preserve the VK identity.
+MACRO_VKS = {0xD9: "M1", 0xB9: "M2", 0xC6: "M3", 0xB8: "M4", 0xC7: "M5"}
+
+
+def vk_to_firmware_code(vk: int) -> int:
+    """Translate a Windows VK code (from KB.ini) to an RK firmware code."""
+    if vk == 0xFA:
+        return FN_CODE
+    if vk in MACRO_VKS:
+        # Macro slots: no HID equivalent; keep the VK in the low byte as a
+        # stable marker so profiles round-trip. Firmware interprets by slot.
+        return 0xF000 | (vk & 0xFF)
+    hid = VK_TO_HID.get(vk)
+    if hid is None:
+        raise KeyError(f"no HID mapping for VK {vk:#x}")
+    if hid in (0xE0, 0xE1, 0xE2, 0xE3):  # left mods
+        return {"ctrl": MOD_LEFT["ctrl"], "shift": MOD_LEFT["shift"],
+                "alt": MOD_LEFT["alt"], "win": MOD_LEFT["win"]}[
+            {0xE0: "ctrl", 0xE1: "shift", 0xE2: "alt", 0xE3: "win"}[hid]]
+    if hid in (0xE4, 0xE5, 0xE6, 0xE7):  # right mods
+        return {0xE4: MOD_RIGHT["ctrl"], 0xE5: MOD_RIGHT["shift"],
+                0xE6: MOD_RIGHT["alt"], 0xE7: MOD_RIGHT["win"]}[hid]
+    return hid << 8
+
+
+def firmware_code_label(code: int) -> str:
+    """Best-effort human label for a firmware code (for TUI display)."""
+    if code == FN_CODE:
+        return "Fn"
+    for name, v in {**{f"L{k.title()}": v for k, v in MOD_LEFT.items()},
+                    **{f"R{k.title()}": v for k, v in MOD_RIGHT.items()}}.items():
+        if code == v:
+            return name
+    if (code & 0xF000) == 0xF000 and (code & 0xFF) in MACRO_VKS:
+        return MACRO_VKS[code & 0xFF]
+    hid = (code >> 8) & 0xFF
+    rev = {v: k for k, v in VK_TO_HID.items() if v == hid and k not in MACRO_VKS and k != 0xFA}
+    if rev:
+        vk = sorted(rev)[0]
+        return f"VK {vk:#04x}"
+    return f"{code:#06x}"

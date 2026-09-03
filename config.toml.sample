@@ -1,0 +1,2 @@
+# omakeyfig user config. theme_follow=false by default (opt-in auto lighting sync).
+theme_follow = false

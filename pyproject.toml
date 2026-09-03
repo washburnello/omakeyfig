@@ -1,0 +1,34 @@
+[project]
+name = "omakeyfig"
+version = "0.1.0"
+description = "Unofficial TUI customizer for Royal Kludge RK-S70 (and other RK boards) on Omarchy/Linux. Key remap, lighting, macros, profiles."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "washburnello" }]
+keywords = ["royal-kludge", "rk-s70", "keyboard", "hid", "tui", "textual", "omarchy"]
+dependencies = [
+  "textual>=3.0",
+  "hidapi>=0.14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.4"]
+
+[project.scripts]
+omakeyfig = "omakeyfig.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["omakeyfig*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

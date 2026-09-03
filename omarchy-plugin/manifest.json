@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "washburnello.omakeyfig",
+  "name": "Omakeyfig",
+  "version": "0.1.0",
+  "author": "washburnello",
+  "description": "RK keyboard quick settings (unofficial)",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "Omakeyfig",
+    "description": "RK keyboard: click to open TUI, right-click for quick actions",
+    "category": "Utility",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

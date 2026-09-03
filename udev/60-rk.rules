@@ -1,0 +1,3 @@
+# Royal Kludge keyboards (SINO WEALTH 258a) — allow user-space HID access.
+# Install: sudo cp udev/60-rk.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger
+SUBSYSTEMS=="usb|hidraw", ATTRS{idVendor}=="258a", TAG+="uaccess"
