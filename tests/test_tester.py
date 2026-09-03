@@ -61,6 +61,26 @@ def test_clear_resets_indicators():
     _run(scenario())
 
 
+def test_board_rows_are_flush():
+    """Rows must sit directly adjacent (height 1, contiguous) — no gaps."""
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = await _open_tester(app)
+            for _ in range(5):
+                await pilot.press("down")
+            await pilot.press("enter")
+            await pilot.pause()
+            rows = list(app.query(".kb-row"))
+            assert len(rows) == 5
+            for row in rows:
+                assert row.region.height == 1, row.region
+            ys = [row.region.y for row in rows]
+            for a, b in zip(ys, ys[1:]):
+                assert b - a == 1, ys
+    _run(scenario())
+
+
 def test_led_mode_switch():
     async def scenario():
         app = OmakeyfigApp()
