@@ -27,25 +27,32 @@ def cmd_status(args) -> int:
     return 0
 
 
-def _default_mappings(pid: int) -> dict[int, int]:
+def _default_mappings(pid: int) -> tuple[dict[int, int], int]:
+    """Defaults keyed by firmware SLOT (the 8th KB.ini field), NOT position.
+
+    Slots are sparse (S70 uses 1..101); unused slots encode as 0, exactly
+    like KludgeKnight's full-buffer fill.
+    """
     keys = load_layout(pid)
+    n_keys = max(k.slot for k in keys) + 1
     out: dict[int, int] = {}
-    for pos, k in enumerate(keys):
+    for k in keys:
         try:
-            out[pos] = vk_to_firmware_code(k.vk)
+            out[k.slot] = vk_to_firmware_code(k.vk)
         except KeyError:
-            out[pos] = 0
-    return out
+            out[k.slot] = 0
+    return out, n_keys
 
 
 def cmd_write_map(args) -> int:
     pid = int(args.pid, 0)
-    mappings = _default_mappings(pid)
+    mappings, n_keys = _default_mappings(pid)
     if args.profile:
         prof = profiles.load_profile(args.profile)
+        n_keys = max(n_keys, *(int(k) + 1 for k in prof.get("mappings", {})))
         for k, v in prof.get("mappings", {}).items():
             mappings[int(k)] = int(v)
-    buffers = codec.encode_keymap(mappings, len(load_layout(pid)))
+    buffers = codec.encode_keymap(mappings, n_keys)
     if args.dry_run:
         print(f"dry-run: {len(buffers)} buffers x {len(buffers[0])} bytes, "
               f"{len(mappings)} keys; first bytes: {buffers[0][:8].hex()}")
@@ -100,7 +107,8 @@ def cmd_light(args) -> int:
 
 def cmd_save_profile(args) -> int:
     pid = int(args.pid, 0)
-    payload = {"pid": pid, "mappings": {str(k): v for k, v in _default_mappings(pid).items()},
+    mappings, _ = _default_mappings(pid)
+    payload = {"pid": pid, "mappings": {str(k): v for k, v in mappings.items()},
                "lighting": lighting.LightingState().__dict__}
     p = profiles.save_profile(args.name, payload)
     print(f"Saved {p}")

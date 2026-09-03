@@ -1,11 +1,15 @@
-from omakeyfig.keycodes import MACRO_VKS, vk_to_firmware_code
+from omakeyfig.keycodes import MACRO_FW, MACRO_VKS, vk_to_firmware_code
 from omakeyfig.layouts import parse_kb_ini
 
 
-def test_fn_and_macro_markers():
+def test_fn_and_macro_codes():
     assert vk_to_firmware_code(0xFA) == 0xB000
-    for vk in MACRO_VKS:
-        assert vk_to_firmware_code(vk) & 0xF000 == 0xF000
+    assert vk_to_firmware_code(0xD9) == 0x010400  # M1 = Ctrl+A
+    assert vk_to_firmware_code(0xB9) == 0x010600  # M2 = Ctrl+C
+    assert vk_to_firmware_code(0xC6) == 0x011900  # M3 = Ctrl+V
+    assert vk_to_firmware_code(0xB8) == 0x011B00  # M4 = Ctrl+X
+    assert vk_to_firmware_code(0xC7) == 0x011600  # M5 = Ctrl+S
+    assert set(MACRO_FW) == set(MACRO_VKS)
 
 
 def test_regular_key_encoding():

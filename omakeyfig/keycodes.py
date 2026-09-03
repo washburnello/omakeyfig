@@ -52,8 +52,12 @@ VK_TO_HID: dict[int, int] = {
     0xD9: 0x00, 0xB9: 0x00, 0xC6: 0x00, 0xB8: 0x00, 0xC7: 0x00,
 }
 
-# Macro-key VKs on the S70 (M1..M5, left column). Values are vendor-specific;
-# the firmware treats them as macro slots, so we preserve the VK identity.
+# Macro-key firmware codes for the S70, from KludgeKnight's USB capture of a
+# SPLIT70 reset (these are Ctrl-combos, not single HID codes):
+#   M1/all  = Ctrl+A, M2/copy = Ctrl+C, M3/past = Ctrl+V,
+#   M4/cut  = Ctrl+X, M5/save = Ctrl+S.
+MACRO_FW = {0xD9: 0x010400, 0xB9: 0x010600, 0xC6: 0x011900,
+            0xB8: 0x011B00, 0xC7: 0x011600}
 MACRO_VKS = {0xD9: "M1", 0xB9: "M2", 0xC6: "M3", 0xB8: "M4", 0xC7: "M5"}
 
 
@@ -61,10 +65,8 @@ def vk_to_firmware_code(vk: int) -> int:
     """Translate a Windows VK code (from KB.ini) to an RK firmware code."""
     if vk == 0xFA:
         return FN_CODE
-    if vk in MACRO_VKS:
-        # Macro slots: no HID equivalent; keep the VK in the low byte as a
-        # stable marker so profiles round-trip. Firmware interprets by slot.
-        return 0xF000 | (vk & 0xFF)
+    if vk in MACRO_FW:
+        return MACRO_FW[vk]
     hid = VK_TO_HID.get(vk)
     if hid is None:
         raise KeyError(f"no HID mapping for VK {vk:#x}")
@@ -86,8 +88,10 @@ def firmware_code_label(code: int) -> str:
                     **{f"R{k.title()}": v for k, v in MOD_RIGHT.items()}}.items():
         if code == v:
             return name
-    if (code & 0xF000) == 0xF000 and (code & 0xFF) in MACRO_VKS:
-        return MACRO_VKS[code & 0xFF]
+    if (code & 0xFFFF00) == 0x010000 and (code & 0xFF) in (0x04, 0x06, 0x19, 0x1B, 0x16):
+        for vk, fw in MACRO_FW.items():
+            if fw == code:
+                return MACRO_VKS[vk]
     hid = (code >> 8) & 0xFF
     rev = {v: k for k, v in VK_TO_HID.items() if v == hid and k not in MACRO_VKS and k != 0xFA}
     if rev:
