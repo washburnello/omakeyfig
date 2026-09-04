@@ -75,6 +75,9 @@ class RemapScreen(VerticalScroll):
         board.click_mode = "select"
         yield board
         with Horizontal():
+            yield Button("Fn", id="btn-fn")
+            yield Button("F-Shift", id="btn-fshift")
+        with Horizontal():
             yield Label("Selected ")
             yield Static("none", id="remap-sel")
         with Horizontal():
@@ -100,6 +103,7 @@ class TesterScreen(VerticalScroll):
         yield KeyboardTester(load_layout(0x0220), omarchy.keyboard_accent())
         with Horizontal():
             yield Button("Fn", id="btn-fn")
+            yield Button("F-Shift", id="btn-fshift")
             yield Button("Clear", id="btn-clear")
             yield Button("Back", id="btn-back")
         yield RichLog(id="keylog", highlight=True, max_lines=200)
@@ -135,6 +139,7 @@ class LightingScreen(VerticalScroll):
         yield KeyboardTester(load_layout(0x0220), accent)
         with Horizontal():
             yield Button("Fn", id="btn-fn")
+            yield Button("F-Shift", id="btn-fshift")
             yield Button("Push to keyboard", id="btn-push")
             yield Button("Back", id="btn-back")
         yield Static("", id="light-status")
@@ -523,6 +528,14 @@ class OmakeyfigApp(App):
                 return
             board.set_fn_view(not board.fn_view)
             event.button.variant = "success" if board.fn_view else "default"
+            return
+        if bid == "btn-fshift":
+            try:
+                board = self.query_one("#kb", KeyboardTester)
+            except Exception:
+                return
+            board.set_fshift_view(not board.fshift_view)
+            event.button.variant = "success" if board.fshift_view else "default"
             return
         steps = {"btn-b-minus": ("light_b", -1), "btn-b-plus": ("light_b", 1),
                  "btn-s-minus": ("light_s", -1), "btn-s-plus": ("light_s", 1),

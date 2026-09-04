@@ -46,6 +46,21 @@ FN_LAYER: dict[int, str] = {
 def fn_legend(slot: int) -> str | None:
     return FN_LAYER.get(slot)
 
+
+# F-shift mode (toggled on the board with Fn+LeftCtrl): the number row
+# defaults to F1..F12, and Fn+those keys emit media functions. Mapping is
+# the RK-standard F-key media table (RK61 docs; S70 manual lists the same
+# 12 functions). Slots are the S70 number-row slots 13..85.
+FSHIFT_KEYS: dict[int, str] = {
+    13: "F1", 19: "F2", 25: "F3", 31: "F4", 37: "F5", 43: "F6",
+    55: "F7", 61: "F8", 67: "F9", 73: "F10", 79: "F11", 85: "F12",
+}
+FSHIFT_FN_MEDIA: dict[int, str] = {
+    13: "MyPC", 19: "Browser", 25: "Mail", 31: "Calc", 37: "Player",
+    43: "Stop", 55: "Prev", 61: "Play", 67: "Next", 73: "Mute",
+    79: "Vol-", 85: "Vol+",
+}
+
 # US-shifted symbols map back to their base key for highlight purposes.
 SHIFTED = {
     "!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6",
@@ -176,20 +191,38 @@ class KeyWidget(Static):
         self.slot = kd.slot
         self.base_label = short_label(kd)
         self.shown_label = self.base_label
+        self.fn_view = False
+        self.fshift_view = False
         self.styles.width = cells
 
-    def set_fn_view(self, on: bool) -> None:
-        if not on:
-            self.shown_label = self.base_label
-            self.update(self.base_label)
+    def refresh_label(self) -> None:
+        if self.fn_view:
+            if self.fshift_view and self.slot in FSHIFT_FN_MEDIA:
+                self.shown_label = FSHIFT_FN_MEDIA[self.slot]
+                self.update(f"[bold]{self.shown_label}[/bold]")
+                return
+            legend = fn_legend(self.slot)
+            if legend is None:
+                self.shown_label = "?"
+                self.update("[dim]?[/dim]")
+            else:
+                self.shown_label = legend
+                self.update(f"[bold]{legend}[/bold]")
             return
-        legend = fn_legend(self.slot)
-        if legend is None:
-            self.shown_label = "?"
-            self.update("[dim]?[/dim]")
-        else:
-            self.shown_label = legend
-            self.update(f"[bold]{legend}[/bold]")
+        if self.fshift_view and self.slot in FSHIFT_KEYS:
+            self.shown_label = FSHIFT_KEYS[self.slot]
+            self.update(f"[bold]{self.shown_label}[/bold]")
+            return
+        self.shown_label = self.base_label
+        self.update(self.base_label)
+
+    def set_fn_view(self, on: bool) -> None:
+        self.fn_view = on
+        self.refresh_label()
+
+    def set_fshift_view(self, on: bool) -> None:
+        self.fshift_view = on
+        self.refresh_label()
 
     def on_click(self) -> None:
         parent = self.parent
@@ -219,6 +252,7 @@ class KeyboardTester(Vertical):
         self.pressed: set[int] = set()
         self.led_mode = "Off"
         self.fn_view = False
+        self.fshift_view = False
         self.by_slot: dict[int, KeyWidget] = {}
         self.click_mode = "flash"  # or "select" for the remap screen
         self.selected: int | None = None
@@ -271,11 +305,16 @@ class KeyboardTester(Vertical):
         self.pressed.clear()
         self._paint()
 
-    # -- Fn-layer view --------------------------------------------------------
+    # -- Fn-layer / F-shift views -----------------------------------------------
     def set_fn_view(self, on: bool) -> None:
         self.fn_view = on
         for w in self.by_slot.values():
             w.set_fn_view(on)
+
+    def set_fshift_view(self, on: bool) -> None:
+        self.fshift_view = on
+        for w in self.by_slot.values():
+            w.set_fshift_view(on)
 
     # -- cursor selection (remap screen) ---------------------------------------
     def _center(self, kd: KeyDef) -> float:

@@ -93,7 +93,6 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
 `rkf.py` output. Board currently has FACTORY codes in these slots.
 
 ## Fn layer (fixed firmware table — NOT writable)
-
 - The Fn layer is a second, firmware-fixed table keyed by physical key/slot,
   independent of the base map. Proof: after remapping base PgUp->Home,
   Fn+PgUp still emits Pause. The official app cannot customize it either:
@@ -109,6 +108,24 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
   Fn, press keys, read what the OS receives.
 - Workaround for "Fn+PgUp should be PgUp": OS-level remap of the Pause key
   (e.g. keyd/Hyprland maps Pause -> PgUp). Mention, don't implement here.
+
+### F-shift mode (another fixed firmware mode — also NOT writable)
+
+- Chord **Fn+LeftCtrl** (bottom row, 2nd from left) swaps the number row to
+  F1..F12 as the *default* layer; the manual's "1F indicator" stays
+  constantly on while active. Press the chord again to swap back.
+- While F-shifted, **Fn+F-key emits media functions** (RK-standard table:
+  F1=MyPC F2=Browser F3=Mail F4=Calc F5=Player F6=Stop F7=Prev F8=Play
+  F9=Next F10=Mute F11=Vol- F12=Vol+). S70 manual lists exactly these 12
+  functions; per-key mapping assumed from the RK61 table — confirm any
+  doubtful key with the tester before relying on it.
+- No HID command for toggling it is known (Rangoli/KludgeKnight have no
+  such command; the .rkf has no such field). User toggles it on the board.
+- UI: "F-Shift" toggle in tester/lighting/remap screens
+  (`FSHIFT_KEYS`/`FSHIFT_FN_MEDIA` in keyboard_widget.py). F-Shift alone
+  shows F1..F12 on the number row; F-Shift+Fn shows the media legends.
+  Remapping F-keys in the remap UI does NOT change what F-shift emits
+  (same fixed-table reason as the Fn layer).
 
 ## Past bugs (do not reintroduce)
 

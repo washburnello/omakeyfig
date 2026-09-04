@@ -50,3 +50,11 @@ def test_fn_layer_legends():
     assert fn_legend(94) == "Brt+"
     assert fn_legend(14) is None     # Q: unknown until tester-confirmed
     assert fn_legend(71) is None     # Fn itself has no Fn legend
+
+
+def test_fshift_tables():
+    from omakeyfig.keyboard_widget import FSHIFT_FN_MEDIA, FSHIFT_KEYS
+    assert len(FSHIFT_KEYS) == 12 and len(FSHIFT_FN_MEDIA) == 12
+    assert FSHIFT_KEYS[13] == "F1" and FSHIFT_KEYS[85] == "F12"
+    assert FSHIFT_FN_MEDIA[61] == "Play" and FSHIFT_FN_MEDIA[85] == "Vol+"
+    assert set(FSHIFT_KEYS) == set(FSHIFT_FN_MEDIA)  # same physical keys

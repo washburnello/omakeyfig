@@ -158,3 +158,27 @@ def test_fn_toggle_swaps_labels():
             assert board.fn_view is False
             assert board.by_slot[13].shown_label == "1"
     _run(scenario())
+
+
+def test_fshift_toggle_views():
+    """F-Shift shows F-keys on the number row; +Fn shows media legends."""
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = await _open_tester(app)
+            for _ in range(5):
+                await pilot.press("down")
+            await pilot.press("enter")
+            await pilot.pause()
+            board = app.query_one("#kb", KeyboardTester)
+            assert board.by_slot[13].shown_label == "1"
+            board.set_fshift_view(True)
+            assert board.by_slot[13].shown_label == "F1"
+            assert board.by_slot[14].shown_label == "Q"  # non-number row untouched
+            board.set_fn_view(True)
+            assert board.by_slot[13].shown_label == "MyPC"
+            assert board.by_slot[61].shown_label == "Play"
+            board.set_fn_view(False)
+            board.set_fshift_view(False)
+            assert board.by_slot[13].shown_label == "1"
+    _run(scenario())
