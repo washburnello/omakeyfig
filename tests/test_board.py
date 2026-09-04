@@ -58,3 +58,33 @@ def test_fshift_tables():
     assert FSHIFT_KEYS[13] == "F1" and FSHIFT_KEYS[85] == "F12"
     assert FSHIFT_FN_MEDIA[61] == "Play" and FSHIFT_FN_MEDIA[85] == "Vol+"
     assert set(FSHIFT_KEYS) == set(FSHIFT_FN_MEDIA)  # same physical keys
+
+
+def test_fn_user_confirmed_legends():
+    from omakeyfig.keyboard_widget import fn_legend
+    assert fn_legend(80) == "Home"     # Fn+[
+    assert fn_legend(86) == "ScrLk"    # Fn+]
+    assert fn_legend(92) == "Style"    # Fn+\ lighting style
+    assert fn_legend(52) == "Hue"      # Fn+N hue cycle
+
+
+def test_keycap_overrides(tmp_path, monkeypatch):
+    from omakeyfig import keycaps as _k
+    monkeypatch.setattr(_k, "keycaps_file", lambda: tmp_path / "keycaps.toml")
+    assert _k.display_label(14, "Q") == "Q"
+    _k.set_keycap(14, "ESC")
+    assert _k.display_label(14, "Q") == "ESC"
+    _k.set_keycap(14, None)
+    assert _k.display_label(14, "Q") == "Q"
+
+
+def test_keywidget_uses_keycap(tmp_path, monkeypatch):
+    from omakeyfig import keycaps as _k
+    from omakeyfig.keyboard_widget import KeyWidget
+    from omakeyfig.layouts import load_layout
+    monkeypatch.setattr(_k, "keycaps_file", lambda: tmp_path / "keycaps.toml")
+    monkeypatch.setattr("omakeyfig.keycaps.keycaps_file", lambda: tmp_path / "keycaps.toml")
+    _k.set_keycap(14, "ESC")
+    kd = next(k for k in load_layout(0x0220) if k.slot == 14)
+    w = KeyWidget(kd, 5)
+    assert w.keycap_label == "ESC" and w.base_label == "Q"

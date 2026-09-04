@@ -52,9 +52,11 @@ omakeyfig tui                     # Textual TUI
   each pressed key white and logs the OS key event + firmware slot(s); both
   halves of the split spacebar light together, as do L/R modifier pairs.
   **Clear** resets all indicators. Leave via **Back**. The **Fn** toggle
-  swaps labels to the Fn layer (unknowns show `?` — hold physical Fn and
-  press keys to identify them); the **F-Shift** toggle mirrors the board's
-  Fn+LeftCtrl mode (number row as F1–F12, +Fn for media legends).
+  swaps labels to the Fn layer (F1–F12, Win/Mac, Home, ScrLk, Style, Hue,
+  Ins, Pause, End, Brt±, Spd◀▶; unknowns show `?`); the **F-Shift** toggle
+  mirrors the board's Fn+LeftCtrl mode (number row as F1–F12, +Fn for media
+  legends). Board labels follow `keycaps.toml` if you swap physical caps
+  (`omakeyfig keycap <slot> <label>`).
 - **Remap**: cursor the visual board (click, arrows, or `hjkl`), type to
   filter the 103-action catalog (`/`-style live filter), Enter to assign,
   `u` to undo, `?` for the binding overlay, `Ctrl+S` to review the diff and

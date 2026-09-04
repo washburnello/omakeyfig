@@ -35,12 +35,16 @@ FN_LAYER: dict[int, str] = {
     13: "F1", 19: "F2", 25: "F3", 31: "F4", 37: "F5", 43: "F6",
     55: "F7", 61: "F8", 67: "F9", 73: "F10", 79: "F11", 85: "F12",
     15: "Win", 21: "Mac",       # Fn+A Windows mode, Fn+S Mac mode
+    80: "Home", 86: "ScrLk",    # user-confirmed (was "?" before)
+    92: "Style",                # user-confirmed: lighting style/mode
+    52: "Hue",                  # user-confirmed: Fn+N cycles hue
     98: "Ins",                  # Fn+Delete -> Insert (manual lists Insert)
     99: "Pause", 100: "End",    # user-verified
-    92: "Color",                # Fn+| cycles color presets
     94: "Brt+", 95: "Brt-",     # Fn+Up/Down brightness
     89: "Spd◀", 101: "Spd▶",    # Fn+Left/Right animation speed/direction
 }
+# FN-LCK (user's name) = the Fn+LeftCtrl chord that toggles F-shift mode,
+# not a separate combo. The F-Shift board toggle mirrors that mode.
 
 
 def fn_legend(slot: int) -> str | None:
@@ -186,14 +190,17 @@ class KeyWidget(Static):
     }
     """
 
-    def __init__(self, kd: KeyDef, cells: int) -> None:
-        super().__init__(short_label(kd))
+    def __init__(self, kd: KeyDef, cells: int, keycaps: dict[int, str] | None = None) -> None:
+        from omakeyfig.keycaps import display_label
+        super().__init__("")
         self.slot = kd.slot
         self.base_label = short_label(kd)
-        self.shown_label = self.base_label
+        self.keycap_label = display_label(kd.slot, self.base_label, keycaps)
+        self.shown_label = self.keycap_label
         self.fn_view = False
         self.fshift_view = False
         self.styles.width = cells
+        self.update(self.keycap_label)
 
     def refresh_label(self) -> None:
         if self.fn_view:
@@ -213,8 +220,8 @@ class KeyWidget(Static):
             self.shown_label = FSHIFT_KEYS[self.slot]
             self.update(f"[bold]{self.shown_label}[/bold]")
             return
-        self.shown_label = self.base_label
-        self.update(self.base_label)
+        self.shown_label = self.keycap_label
+        self.update(self.keycap_label)
 
     def set_fn_view(self, on: bool) -> None:
         self.fn_view = on

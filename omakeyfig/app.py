@@ -448,8 +448,11 @@ class OmakeyfigApp(App):
         if board.selected is None:
             sel.update("none")
         else:
+            from omakeyfig.keycaps import display_label
             cur = self.remap_effective(board.selected)
-            sel.update(f"slot {board.selected}: {remap.label_for_fw(cur)}")
+            cap = display_label(board.selected,
+                                board.by_slot[board.selected].base_label)
+            sel.update(f"slot {board.selected} [cap {cap}]: {remap.label_for_fw(cur)}")
         diff.clear()
         for line in self.remap_diff_lines():
             diff.write(line)

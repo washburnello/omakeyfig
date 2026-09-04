@@ -105,12 +105,25 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
 - UI: "Fn" toggle button in tester + lighting screens swaps labels
   (sub-rows were rejected: they double the 15-line board to 30).
 - Unknown legends are completed empirically: open the tester, hold physical
-  Fn, press keys, read what the OS receives.
+  Fn, press keys, read what the OS receives. User-confirmed so far (Sep 2026,
+  from the user's own layout diagram): Fn+`=PtSc NOT confirmed (user will
+  wire PrtSc via base remap if wanted); Fn+[=Home, Fn+]=ScrollLock,
+  Fn+\=lighting Style, Fn+N=hue cycle. FN-LCK is the user's name for the
+  Fn+LeftCtrl F-shift chord itself, not a separate combo.
+
+## Keycap layer (display only — omakeyfig/keycaps.py)
+
+- The user swaps physical keycaps. `~/.config/omakeyfig/keycaps.toml`
+  maps slot -> label shown on the board. Firmware matching, remap logic,
+  and profiles NEVER use keycap labels — only slots.
+- KeyWidget shows `keycap_label`; `base_label` (firmware function) stays
+  available for status lines. CLI: `omakeyfig keycap <slot> <label>` and
+  `omakeyfig keycap <slot> --clear`. A full keycap-editor UI is parked
+  until the user pastes their ORIGINAL (pre-swap) layout.
 - Workaround for "Fn+PgUp should be PgUp": OS-level remap of the Pause key
   (e.g. keyd/Hyprland maps Pause -> PgUp). Mention, don't implement here.
 
 ### F-shift mode (another fixed firmware mode — also NOT writable)
-
 - Chord **Fn+LeftCtrl** (bottom row, 2nd from left) swaps the number row to
   F1..F12 as the *default* layer; the manual's "1F indicator" stays
   constantly on while active. Press the chord again to swap back.

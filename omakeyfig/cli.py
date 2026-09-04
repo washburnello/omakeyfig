@@ -120,6 +120,18 @@ def cmd_list_profiles(args) -> int:
     return 0
 
 
+def cmd_keycap(args) -> int:
+    from omakeyfig import keycaps as _k
+    if args.clear:
+        caps = _k.set_keycap(int(args.slot, 0), None)
+        print(f"slot {args.slot}: keycap override cleared")
+    else:
+        caps = _k.set_keycap(int(args.slot, 0), args.label)
+        print(f"slot {args.slot}: keycap reads \"{args.label}\"")
+    print(f"({len(caps)} override(s) in { _k.keycaps_file()})")
+    return 0
+
+
 def cmd_save_profile(args) -> int:
     pid = int(args.pid, 0)
     mappings, _ = _default_mappings(pid)
@@ -166,6 +178,11 @@ def build_parser() -> argparse.ArgumentParser:
     sv.set_defaults(fn=cmd_save_profile)
     lp = sub.add_parser("list-profiles", help="List saved profiles")
     lp.set_defaults(fn=cmd_list_profiles)
+    kc = sub.add_parser("keycap", help="Set/clear a keycap display override by slot")
+    kc.add_argument("slot", help="firmware slot, e.g. 0x61 or 97")
+    kc.add_argument("label", nargs="?", default=None, help="what the cap reads (omit with --clear)")
+    kc.add_argument("--clear", action="store_true")
+    kc.set_defaults(fn=cmd_keycap)
     lp = sub.add_parser("tui", help="Open the Textual TUI")
     lp.set_defaults(fn=cmd_tui)
     return ap
