@@ -16,11 +16,12 @@ OMAKEYFIG_BACKEND=/path/to/omakeyfig ./omakeyfig-go   # or omakeyfig on PATH
 
 ## Status
 
-Working: menu, devices, key tester (press-to-light, caps/slots/binds,
-Fn + F-shift views, `?` overlay, persistent help bar), lighting
-(effect cycle, steppers, push), remap (board cursor, live filter,
-assign, diff, undo, confirm-gated push via `write-map --mapping-file`).
-Macros/profiles live in the Python TUI for now.
+Working: menu (keyboard + mouse), devices, key tester (click or press to
+light, caps/slots/binds, Fn + F-shift views, `?` overlay, persistent help
+bar), lighting (effect cycle, steppers, push), remap (board cursor by
+keys or mouse click, live filter, assign, diff, undo, confirm-gated push
+via `write-map --mapping-file`). Macros/profiles live in the Python TUI
+for now. Mouse needs a mouse-capable terminal (Alacritty works).
 
 ## Tests
 

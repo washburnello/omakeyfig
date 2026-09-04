@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // Remap screen: cursor the board, filter the action catalog, assign,
@@ -321,7 +322,8 @@ func (m *model) viewRemap() string {
 		b.WriteString("\n" + r.status + "\n")
 	}
 	if r.confirm {
-		box := "Push " + itoa(len(lines)) + " change(s) to the keyboard?\nFirmware is write-only.\n\n[y] write   [n] cancel"
+		box := "Push " + itoa(len(lines)) + " change(s) to the keyboard?\nFirmware is write-only.\n\n" +
+			zone.Mark("confirm-yes", "[y] write") + "   " + zone.Mark("confirm-no", "[n] cancel")
 		return b.String() + "\n" + m.th.box.Render(box) + "\n"
 	}
 	return b.String()

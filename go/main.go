@@ -12,6 +12,7 @@ import (
 	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 func backendPath() (string, error) {
@@ -36,7 +37,8 @@ func main() {
 		os.Exit(1)
 	}
 	m := newModel(back, doc)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	zone.NewGlobal()
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "omakeyfig-go:", err)
 		os.Exit(1)

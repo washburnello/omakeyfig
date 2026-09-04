@@ -1,10 +1,14 @@
 package main
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
+
+	zone "github.com/lrstanley/bubblezone"
 )
 
 func strp(s string) *string { return &s }
@@ -117,5 +121,108 @@ func TestLiveExport(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("slots view missing %s", want)
 		}
+	}
+}
+
+func TestZoneHelpers(t *testing.T) {
+	if s, ok := parseSlotZone("slot-14"); !ok || s != 14 {
+		t.Fatalf("parse slot-14 -> %d,%v", s, ok)
+	}
+	if _, ok := parseSlotZone("menu-2"); ok {
+		t.Fatal("menu-2 must not parse as slot")
+	}
+	rows := testRows()
+	if ri, ci, ok := findCell(rows, 35); !ok || ri != 0 || ci != 1 {
+		t.Fatalf("findCell 35 -> %d,%d,%v", ri, ci, ok)
+	}
+	if _, _, ok := findCell(rows, 999); ok {
+		t.Fatal("findCell 999 should miss")
+	}
+	out := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{})
+	if !strings.Contains(out, "Q") {
+		t.Fatal("rendered board lost labels")
+	}
+	// Scan registers zones asynchronously; poll until they land.
+	zone.Scan(out)
+	var zi *zone.ZoneInfo
+	for i := 0; i < 200; i++ {
+		zi = zone.Get("slot-14")
+		if zi != nil && !zi.IsZero() {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if zi == nil || zi.IsZero() {
+		t.Fatal("slot-14 zone never registered")
+	}
+	if zi.EndX <= zi.StartX || zi.EndY < zi.StartY {
+		t.Fatalf("bogus zone geometry %+v", zi)
+	}
+}
+
+func waitZone(t *testing.T, id string) *zone.ZoneInfo {
+	t.Helper()
+	var zi *zone.ZoneInfo
+	for i := 0; i < 200; i++ {
+		zi = zone.Get(id)
+		if zi != nil && !zi.IsZero() {
+			return zi
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("zone %s never registered", id)
+	return nil
+}
+
+func clickAt(zi *zone.ZoneInfo) tea.MouseMsg {
+	return tea.MouseMsg{
+		X:      (zi.StartX + zi.EndX) / 2,
+		Y:      (zi.StartY + zi.EndY) / 2,
+		Action: tea.MouseActionPress,
+		Button: tea.MouseButtonLeft,
+	}
+}
+
+func TestMouseClickTester(t *testing.T) {
+	doc := fakeDoc()
+	m := newModel("true", doc)
+	m.screen = sTester
+	m.View() // View() scans zones internally; do NOT scan twice (second scan wipes)
+	zi := waitZone(t, "slot-14")
+	mm, _ := m.updateMouse(clickAt(zi))
+	m = mm.(model)
+	if !m.pressed[14] {
+		t.Fatal("click should light slot 14")
+	}
+}
+
+func TestMouseClickRemapMovesCursor(t *testing.T) {
+	doc := fakeDoc()
+	m := newModel("true", doc)
+	m.screen = sRemap
+	m.remap = newRemap(doc)
+	m.View() // View() scans zones internally; do NOT scan twice (second scan wipes)
+	zi := waitZone(t, "slot-14")
+	mm, _ := m.updateMouse(clickAt(zi))
+	m = mm.(model)
+	if !m.remap.hasCursor {
+		t.Fatal("click should place cursor")
+	}
+	slot, ok := m.remap.cursorSlot(doc.Rows)
+	if !ok || slot != 14 {
+		t.Fatalf("cursor -> %d,%v", slot, ok)
+	}
+}
+
+func TestMouseClickMenu(t *testing.T) {
+	doc := fakeDoc()
+	m := newModel("true", doc)
+	m.screen = sMenu
+	m.View() // View() scans zones internally; do NOT scan twice (second scan wipes)
+	zi := waitZone(t, "menu-1")
+	mm, _ := m.updateMouse(clickAt(zi))
+	m = mm.(model)
+	if m.screen != sTester {
+		t.Fatalf("menu click should open tester, at %v", m.screen)
 	}
 }

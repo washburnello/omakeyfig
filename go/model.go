@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 type screen int
@@ -101,6 +102,53 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		return m.updateKey(msg)
+	}
+	return m, nil
+}
+
+func (m model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
+		return m, nil
+	}
+	m.showHelp = false
+	// menu items
+	for i := range menuItems {
+		if z := zone.Get(fmt.Sprintf("menu-%d", i)); z != nil && z.InBounds(msg) {
+			m.menuIx = i
+			return m.updateMenu("enter")
+		}
+	}
+	// confirm gate
+	if m.screen == sRemap && m.remap != nil && m.remap.confirm {
+		if z := zone.Get("confirm-yes"); z != nil && z.InBounds(msg) {
+			return m, m.pushRemap()
+		}
+		if z := zone.Get("confirm-no"); z != nil && z.InBounds(msg) {
+			m.remap.confirm = false
+			return m, nil
+		}
+		return m, nil
+	}
+	// board cells (tester selects/flashes, remap moves cursor)
+	if m.screen == sTester || m.screen == sRemap {
+		for _, row := range m.doc.Rows {
+			for _, c := range row {
+				z := zone.Get(fmt.Sprintf("slot-%d", c.Slot))
+				if z == nil || !z.InBounds(msg) {
+					continue
+				}
+				if m.screen == sTester {
+					m.pressed[c.Slot] = true
+					m.lastKey = fmt.Sprintf("click s%d", c.Slot)
+				} else if m.remap != nil {
+					if ri, ci, ok := findCell(m.doc.Rows, c.Slot); ok {
+						m.remap.row, m.remap.col = ri, ci
+						m.remap.hasCursor = true
+					}
+				}
+				return m, nil
+			}
+		}
 	}
 	return m, nil
 }
@@ -274,9 +322,9 @@ func (m model) View() string {
 		if h <= 0 {
 			h = 24
 		}
-		return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, m.helpBox())
+		return zone.Scan(lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, m.helpBox()))
 	}
-	return b.String()
+	return zone.Scan(b.String())
 }
 
 func (m model) helpBar() string {
@@ -284,7 +332,7 @@ func (m model) helpBar() string {
 	case sMenu:
 		return "↑↓/jk navigate · enter select · ? help · q quit"
 	case sTester:
-		return "press keys to light them · tab view · F1 fn · F2 f-shift · C clear · esc menu"
+		return "click keys to light them · tab view · F1 fn · F2 f-shift · C clear · esc menu"
 	case sLighting:
 		return "←→ effect · 1/2 bri · 3/4 spd · 5/6 sleep · enter push · esc menu"
 	case sRemap:
@@ -301,7 +349,7 @@ func (m model) viewMenu() string {
 		if i == m.menuIx {
 			cursor = m.th.sel.Render("▸ ")
 		}
-		b.WriteString(cursor + item + "\n")
+		b.WriteString(zone.Mark(fmt.Sprintf("menu-%d", i), cursor+item) + "\n")
 	}
 	return b.String()
 }
@@ -341,7 +389,7 @@ func (m model) viewLighting() string {
 var helpText = `omakeyfig-go keybindings
 
   menu     ↑↓/jk move · enter open · q quit
-  tester   any key lights the board · tab cycles caps/slots/binds
+  tester   click or press keys to light the board · tab cycles caps/slots/binds
            F1 fn layer · F2 f-shift · C clears · esc menu
   lighting ←→ change effect · 1/2 brightness · 3/4 speed
            5/6 sleep · enter pushes to keyboard · esc menu

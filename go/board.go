@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // Board rendering + key matching. Lip Gloss borders sit OUTSIDE the box,
@@ -50,6 +52,27 @@ func matchSlots(rows [][]Cell, key string) []int {
 		}
 	}
 	return hits
+}
+
+// findCell locates a slot's row/col for cursor jumps (mouse clicks).
+func findCell(rows [][]Cell, slot int) (int, int, bool) {
+	for ri, row := range rows {
+		for ci, c := range row {
+			if c.Slot == slot {
+				return ri, ci, true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
+// parseSlotZone extracts a slot from a "slot-N" zone id.
+func parseSlotZone(id string) (int, bool) {
+	var slot int
+	if _, err := fmt.Sscanf(id, "slot-%d", &slot); err != nil {
+		return 0, false
+	}
+	return slot, true
 }
 
 func itoa(i int) string {
@@ -121,8 +144,10 @@ func renderBoard(th theme, rows [][]Cell, view string, fnView, fshiftView bool,
 			if pressed[c.Slot] {
 				st = th.pressed
 			}
-			cell := strings.Split(st.Width(inner).Height(1).Render(
-				fit(labelFor(c, view, fnView, fshiftView, binds), inner)), "\n")
+			block := zone.Mark(fmt.Sprintf("slot-%d", c.Slot),
+				st.Width(inner).Height(1).Render(
+					fit(labelFor(c, view, fnView, fshiftView, binds), inner)))
+			cell := strings.Split(block, "\n")
 			for len(cell) < 3 {
 				cell = append(cell, "")
 			}
