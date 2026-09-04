@@ -295,7 +295,8 @@ func (m *model) viewRemap() string {
 	for s, fw := range full {
 		binds[s] = bindLabel(m.doc, fw)
 	}
-	b.WriteString(renderBoard(m.th, m.doc.Rows, "binds", false, false, binds, sel))
+	sa, sc := m.seam()
+	b.WriteString(renderBoard(m.th, m.doc.Rows, "binds", false, false, binds, sel, sa, sc))
 	b.WriteString("\nfilter: " + r.filter + "\n")
 	shown := r.filtered
 	if len(shown) > 12 {

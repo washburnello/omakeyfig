@@ -117,7 +117,7 @@ func labelFor(c Cell, view string, fshiftView bool, binds map[int]string) string
 }
 
 func renderBoard(th theme, rows [][]Cell, view string, fnView, fshiftView bool,
-	binds map[int]string, pressed map[int]bool) string {
+	binds map[int]string, pressed map[int]bool, seamAfter map[int]bool, seamCells int) string {
 	var sb strings.Builder
 	for _, row := range rows {
 		var lines [3]string
@@ -156,6 +156,16 @@ func renderBoard(th theme, rows [][]Cell, view string, fnView, fshiftView bool,
 				legend.WriteString(gap + th.legend.Width(c.Cells).Render(fit(leg, c.Cells)))
 			}
 			cursor = c.X + c.Cells
+			if seamAfter[c.Slot] && seamCells > 0 {
+				pad := strings.Repeat(" ", seamCells)
+				for i := 0; i < 3; i++ {
+					lines[i] += pad
+				}
+				if fnView {
+					legend.WriteString(pad)
+				}
+				cursor += seamCells
+			}
 		}
 		for i := 0; i < 3; i++ {
 			sb.WriteString(strings.TrimRight(lines[i], " ") + "\n")

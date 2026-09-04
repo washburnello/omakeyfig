@@ -138,7 +138,8 @@ def cmd_export(args) -> int:
     from omakeyfig import keycaps as _k
     from omakeyfig import remap as _r
     from omakeyfig.keyboard_widget import (FN_LAYER, FSHIFT_FN_MEDIA,
-                                           FSHIFT_KEYS, cells_for, cluster_rows,
+                                           FSHIFT_KEYS, PX_PER_CELL, SEAM_AFTER_SLOTS,
+                                           SEAM_CELLS, cells_for, cluster_rows,
                                            match_names, short_label)
     pid = int(args.pid, 0)
     keys = load_layout(pid)
@@ -161,7 +162,7 @@ def cmd_export(args) -> int:
             cells.append({
                 "slot": k.slot, "label": label,
                 "cap": caps.get(k.slot, label),
-                "x": round((x1 - min_x) / 9), "cells": cells_for(x2 - x1),
+                "x": round((x1 - min_x) / PX_PER_CELL), "cells": cells_for(x2 - x1),
                 "char": ch, "names": sorted(match_names(k)),
                 "fn": FN_LAYER.get(k.slot),
                 "fshift": FSHIFT_KEYS.get(k.slot),
@@ -178,6 +179,8 @@ def cmd_export(args) -> int:
                      "category": a.category, "fw": a.fw} for a in _r.ACTIONS],
         "effects": list(lighting.EFFECTS),
         "accent": omarchy.keyboard_accent(),
+        "seam_after": sorted(SEAM_AFTER_SLOTS),
+        "seam_cells": SEAM_CELLS,
     }
     print(_json.dumps(doc))
     return 0

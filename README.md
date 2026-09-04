@@ -48,7 +48,8 @@ omakeyfig tui                     # Textual TUI
 - **Omarchy menu** (`Super + Alt + Space`): search for **omakeyfig**.
 - **Terminal**: `omakeyfig tui` (the installer below puts it on PATH).
 - **Key tester**: open the TUI → select **Key tester** → press keys on the
-  S70. A visual board (physical arrangement from the S70 layout data) lights
+  S70. A visual board (physical arrangement from the S70 layout data,
+  including the split seam between halves) lights
   each pressed key white and logs the OS key event + firmware slot(s); both
   halves of the split spacebar light together, as do L/R modifier pairs.
   The log names every candidate slot with its bind (`space -> slot 35

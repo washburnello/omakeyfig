@@ -129,6 +129,17 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
   (explicit user call): PX_PER_CELL = 7 (roomy keys, horizontal scroll on
   narrow terms). Do not re-tighten for minimal layouts.
 
+## Split seam (visible gap between halves)
+
+- The INI rects draw uniform ~15px gaps everywhere, so the seam is NOT
+  geometric — it is hardcoded: `SEAM_AFTER_SLOTS = {43, 38, 39, 40, 35}`
+  (row0 6|7, row1 T|Y, row2 G|H, row3 B|N, bottom SPACE|SPACE),
+  `SEAM_CELLS = 6`, from the user's ASCII layout.
+- Python: `row_layout()` emits ("gap"|"key"|"seam") ops consumed by both
+  the key row and its Fn legend row (keeps them aligned).
+- Go: `export` carries `seam_after`/`seam_cells`; renderBoard pads all
+  three key lines (+ legend line) after those slots.
+
 ## Split spacebar physics (tester honesty)
 
 - Both halves emit the same HID code at factory (Space 0x2C00), so the OS

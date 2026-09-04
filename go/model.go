@@ -367,11 +367,20 @@ func (m model) viewDevices() string {
 	return b.String()
 }
 
+func (m model) seam() (map[int]bool, int) {
+	set := map[int]bool{}
+	for _, s := range m.doc.SeamAfter {
+		set[s] = true
+	}
+	return set, m.doc.SeamCells
+}
+
 func (m model) viewTester() string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("last: %-12s view: %-6s fn:%v fshift:%v pressed:%d\n\n",
 		m.lastKey, views[m.viewIx], m.fnView, m.fshift, len(m.pressed)))
-	b.WriteString(renderBoard(m.th, m.doc.Rows, views[m.viewIx], m.fnView, m.fshift, m.binds(), m.pressed))
+	sa, sc := m.seam()
+	b.WriteString(renderBoard(m.th, m.doc.Rows, views[m.viewIx], m.fnView, m.fshift, m.binds(), m.pressed, sa, sc))
 	return b.String()
 }
 
@@ -382,7 +391,8 @@ func (m model) viewLighting() string {
 	if m.status != "" {
 		b.WriteString(m.status + "\n\n")
 	}
-	b.WriteString(renderBoard(m.th, m.doc.Rows, "caps", false, false, nil, map[int]bool{}))
+	sa, sc := m.seam()
+	b.WriteString(renderBoard(m.th, m.doc.Rows, "caps", false, false, nil, map[int]bool{}, sa, sc))
 	return b.String()
 }
 

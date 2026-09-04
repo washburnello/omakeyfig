@@ -73,8 +73,8 @@ func TestLabelFor(t *testing.T) {
 
 func TestLegendSubRows(t *testing.T) {
 	rows := testRows() // slot 13 has Fn F1
-	off := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{})
-	on := renderBoard(defaultTheme(), rows, "caps", true, false, nil, map[int]bool{})
+	off := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{}, nil, 0)
+	on := renderBoard(defaultTheme(), rows, "caps", true, false, nil, map[int]bool{}, nil, 0)
 	if strings.Count(on, "\n") != strings.Count(off, "\n")+1 {
 		t.Fatalf("fn view should add exactly one legend line:\n%s", on)
 	}
@@ -84,7 +84,7 @@ func TestLegendSubRows(t *testing.T) {
 }
 
 func TestRenderBoard(t *testing.T) {
-	out := renderBoard(defaultTheme(), testRows(), "caps", false, false, nil, map[int]bool{14: true})
+	out := renderBoard(defaultTheme(), testRows(), "caps", false, false, nil, map[int]bool{14: true}, nil, 0)
 	if !strings.Contains(out, "Q") || !strings.Contains(out, "Space") {
 		t.Fatalf("missing labels:\n%s", out)
 	}
@@ -124,7 +124,7 @@ func TestLiveExport(t *testing.T) {
 	if got := matchSlots(doc.Rows, " "); !eq(got, []int{35, 53}) {
 		t.Fatalf("live space -> %v", got)
 	}
-	out := renderBoard(defaultTheme(), doc.Rows, "slots", false, false, nil, map[int]bool{})
+	out := renderBoard(defaultTheme(), doc.Rows, "slots", false, false, nil, map[int]bool{}, nil, 0)
 	// narrow keys truncate ("101" won't fit a 4-cell key); check fittable ones
 	for _, want := range []string{"14", "35", "1"} {
 		if !strings.Contains(out, want) {
@@ -147,7 +147,7 @@ func TestZoneHelpers(t *testing.T) {
 	if _, _, ok := findCell(rows, 999); ok {
 		t.Fatal("findCell 999 should miss")
 	}
-	out := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{})
+	out := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{}, nil, 0)
 	if !strings.Contains(out, "Q") {
 		t.Fatal("rendered board lost labels")
 	}
@@ -233,5 +233,21 @@ func TestMouseClickMenu(t *testing.T) {
 	m = mm.(model)
 	if m.screen != sTester {
 		t.Fatalf("menu click should open tester, at %v", m.screen)
+	}
+}
+
+func TestSeamGap(t *testing.T) {
+	rows := [][]Cell{
+		{
+			{Slot: 43, Label: "6", Cap: "6", X: 0, Cells: 5},
+			{Slot: 55, Label: "7", Cap: "7", X: 5, Cells: 5},
+		},
+	}
+	plain := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{}, nil, 0)
+	seamed := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{},
+		map[int]bool{43: true}, 6)
+	mid := func(out string) string { return strings.Split(out, "\n")[1] }
+	if strings.Count(mid(seamed), " ") < strings.Count(mid(plain), " ")+6 {
+		t.Fatalf("seam should add >=6 spaces:\n%s", seamed)
 	}
 }

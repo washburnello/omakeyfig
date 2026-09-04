@@ -140,3 +140,24 @@ def test_match_candidates_binds_first():
     fw_q = 0x1400
     cands = match_candidates(keys, {14: fw_q}, "q", "q")
     assert cands[0][0] == 14
+
+
+def test_row_layout_has_seam():
+    from omakeyfig.keyboard_widget import cluster_rows, row_layout
+    from omakeyfig.layouts import load_layout
+    rows = cluster_rows(load_layout(0x0220))
+    # row 0: seam after slot 43 ("6"); row 4: after slot 35 (left space)
+    ops0 = row_layout(rows[0])
+    kinds = [o[0] for o in ops0]
+    assert "seam" in kinds
+    seam_i = kinds.index("seam")
+    assert ops0[seam_i - 1][2].slot == 43
+    assert ops0[seam_i][1] == 6
+    ops4 = row_layout(rows[4])
+    kinds4 = [o[0] for o in ops4]
+    assert "seam" in kinds4
+    assert ops4[kinds4.index("seam") - 1][2].slot == 35
+    # no seam slot appears twice, every row with one gets exactly one
+    for r in rows:
+        n = sum(1 for o in row_layout(r) if o[0] == "seam")
+        assert n <= 1

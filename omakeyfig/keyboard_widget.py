@@ -24,6 +24,13 @@ from omakeyfig.layouts import KeyDef
 PX_PER_CELL = 7  # roomy cells for modern monitors; narrow terminals scroll
 KEY_HEIGHT = 3
 
+# The split seam: firmware slots AFTER which the two halves separate.
+# The INI rects draw uniform ~15px gaps everywhere, so the seam is not
+# geometric — it comes from the physical board (user's ASCII layout):
+# row0 6|7, row1 T|Y, row2 G|H, row3 B|N, bottom SPACE|SPACE.
+SEAM_AFTER_SLOTS = frozenset({43, 38, 39, 40, 35})
+SEAM_CELLS = 6
+
 # Fn-layer legends by firmware slot. Sources: user-verified (PgUp->Pause,
 # PgDn->End), S70 manual (Fn+A Windows mode, Fn+S Mac mode), S70 review
 # (Fn+| color presets, Fn+arrows brightness/speed), RK-standard number row
@@ -147,6 +154,30 @@ def cluster_rows(keys: list[KeyDef]) -> list[list[KeyDef]]:
 
 def cells_for(px_width: int) -> int:
     return max(3, round(px_width / PX_PER_CELL))
+
+
+def row_layout(row: list[KeyDef]) -> list[tuple]:
+    """Linear layout ops for one physical row: ("gap"|"key"|"seam", width[, keydef]).
+
+    Includes the split seam: SEAM_CELLS extra cells after the seam slot.
+    Both the key row and its Fn legend row consume this, so they align.
+    """
+    min_x = min(k.rect[0] for k in row)
+    ops: list[tuple] = []
+    cursor = 0
+    for k in row:
+        x1, _, x2, _ = k.rect
+        off = round((x1 - min_x) / PX_PER_CELL)
+        if off > cursor:
+            ops.append(("gap", off - cursor))
+            cursor = off
+        w = cells_for(x2 - x1)
+        ops.append(("key", w, k))
+        cursor += w
+        if k.slot in SEAM_AFTER_SLOTS:
+            ops.append(("seam", SEAM_CELLS))
+            cursor += SEAM_CELLS
+    return ops
 
 
 def find_slots(keys: list[KeyDef], key_name: str, character: str | None) -> list[int]:
@@ -346,35 +377,26 @@ class KeyboardTester(Vertical):
         from textual.widgets import Static as S
         self.rows = cluster_rows(self.keys)
         for row in self.rows:
-            min_x = min(k.rect[0] for k in row)
             with Horizontal(classes="kb-row"):
-                cursor = 0
-                for k in row:
-                    x1, _, x2, _ = k.rect
-                    off = round((x1 - min_x) / PX_PER_CELL)
-                    if off > cursor:
+                for op in row_layout(row):
+                    if op[0] in ("gap", "seam"):
                         gap = S("")
-                        gap.styles.width = off - cursor
+                        gap.styles.width = op[1]
                         yield gap
-                        cursor = off
-                    w = cells_for(x2 - x1)
-                    key = KeyWidget(k, w)
-                    self.by_slot[k.slot] = key
-                    yield key
-                    cursor += w
+                    else:
+                        _, w, k = op
+                        key = KeyWidget(k, w)
+                        self.by_slot[k.slot] = key
+                        yield key
             with Horizontal(classes="kb-legend"):
-                cursor = 0
-                for k in row:
-                    x1, _, x2, _ = k.rect
-                    off = round((x1 - min_x) / PX_PER_CELL)
-                    if off > cursor:
+                for op in row_layout(row):
+                    if op[0] in ("gap", "seam"):
                         gap = S("")
-                        gap.styles.width = off - cursor
+                        gap.styles.width = op[1]
                         yield gap
-                        cursor = off
-                    w = cells_for(x2 - x1)
-                    yield LegendWidget(k, w)
-                    cursor += w
+                    else:
+                        _, w, k = op
+                        yield LegendWidget(k, w)
 
     def on_mount(self) -> None:
         self._timer = self.set_interval(0.1, self._tick)

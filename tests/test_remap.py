@@ -269,7 +269,8 @@ def test_export_json_contract():
         assert _cli.main(["export", "--pid", "0x220"]) == 0
     d = json.loads(buf.getvalue())
     assert set(d) == {"pid", "n_keys", "devices", "rows", "defaults",
-                      "actions", "effects", "accent"}
+                      "actions", "effects", "accent", "seam_after", "seam_cells"}
+    assert sorted(d["seam_after"]) == [35, 38, 39, 40, 43] and d["seam_cells"] == 6
     assert sum(len(r) for r in d["rows"]) == 74
     assert len(d["actions"]) == 103 and len(d["effects"]) == 21
     q = next(c for r in d["rows"] for c in r if c["slot"] == 14)

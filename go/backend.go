@@ -35,14 +35,16 @@ type Action struct {
 }
 
 type Export struct {
-	Pid      int               `json:"pid"`
-	NKeys    int               `json:"n_keys"`
-	Devices  []Device          `json:"devices"`
-	Rows     [][]Cell          `json:"rows"`
-	Defaults map[string]int    `json:"defaults"`
-	Actions  []Action          `json:"actions"`
-	Effects  []string          `json:"effects"`
-	Accent   string            `json:"accent"`
+	Pid       int               `json:"pid"`
+	NKeys     int               `json:"n_keys"`
+	Devices   []Device          `json:"devices"`
+	Rows      [][]Cell          `json:"rows"`
+	Defaults  map[string]int    `json:"defaults"`
+	Actions   []Action          `json:"actions"`
+	Effects   []string          `json:"effects"`
+	Accent    string            `json:"accent"`
+	SeamAfter []int             `json:"seam_after"`
+	SeamCells int               `json:"seam_cells"`
 }
 
 func runBackend(back string, args ...string) (string, error) {

@@ -20,8 +20,9 @@ Working: menu (keyboard + mouse), devices, key tester (click or press to
 light, caps/slots/binds, Fn + F-shift views, `?` overlay, persistent help
 bar), lighting (effect cycle, steppers, push), remap (board cursor by
 keys or mouse click, live filter, assign, diff, undo, confirm-gated push
-via `write-map --mapping-file`). Macros/profiles live in the Python TUI
-for now. Mouse needs a mouse-capable terminal (Alacritty works).
+via `write-map --mapping-file`). Board renders the physical split seam
+(`seam_after`/`seam_cells` from `export`). Macros/profiles live in the
+Python TUI for now. Mouse needs a mouse-capable terminal (Alacritty works).
 
 ## Tests
 
