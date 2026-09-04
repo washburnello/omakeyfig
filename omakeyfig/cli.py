@@ -61,6 +61,13 @@ def cmd_write_map(args) -> int:
         n_keys = max(n_keys, *(int(k) + 1 for k in prof.get("mappings", {})))
         for k, v in prof.get("mappings", {}).items():
             mappings[int(k)] = int(v)
+    if args.mapping_file:
+        import json as _json
+        raw = _json.loads(open(args.mapping_file).read())
+        items = raw.get("mappings", raw) if isinstance(raw, dict) else raw
+        for k, v in dict(items).items():
+            mappings[int(k)] = int(v)
+        n_keys = max(n_keys, *(int(k) + 1 for k in mappings))
     buffers = codec.encode_keymap(mappings, n_keys)
     if args.dry_run:
         print(f"dry-run: {len(buffers)} buffers x {len(buffers[0])} bytes, "
@@ -120,6 +127,62 @@ def cmd_list_profiles(args) -> int:
     return 0
 
 
+def cmd_export(args) -> int:
+    """Machine-readable dump for alternative frontends (Go TUI, bar widget).
+
+    Single JSON object on stdout: devices, layout rows (with slot, label,
+    cells, fn/fshift legends, match names, printable char), action catalog,
+    lighting effects, fn tables, theme accent, and the default slot map.
+    """
+    import json as _json
+    from omakeyfig import keycaps as _k
+    from omakeyfig import remap as _r
+    from omakeyfig.keyboard_widget import (FN_LAYER, FSHIFT_FN_MEDIA,
+                                           FSHIFT_KEYS, cells_for, cluster_rows,
+                                           match_names, short_label)
+    pid = int(args.pid, 0)
+    keys = load_layout(pid)
+    caps = _k.load_keycaps()
+    try:
+        devs = hid_layer.list_rk_devices()
+        for d in devs:
+            d["path"] = d["path"].decode("utf-8", "replace") \
+                if isinstance(d["path"], bytes) else d["path"]
+    except RuntimeError:
+        devs = []
+    rows = []
+    for row in cluster_rows(keys):
+        min_x = min(k.rect[0] for k in row)
+        cells = []
+        for k in row:
+            x1, _, x2, _ = k.rect
+            label = short_label(k)
+            ch = label.lower() if len(label) == 1 else None
+            cells.append({
+                "slot": k.slot, "label": label,
+                "cap": caps.get(k.slot, label),
+                "x": round((x1 - min_x) / 9), "cells": cells_for(x2 - x1),
+                "char": ch, "names": sorted(match_names(k)),
+                "fn": FN_LAYER.get(k.slot),
+                "fshift": FSHIFT_KEYS.get(k.slot),
+                "fshift_fn": FSHIFT_FN_MEDIA.get(k.slot),
+            })
+        rows.append(cells)
+    mappings, n_keys = _default_mappings(pid)
+    doc = {
+        "pid": pid, "n_keys": n_keys,
+        "devices": devs,
+        "rows": rows,
+        "defaults": {str(s): c for s, c in mappings.items()},
+        "actions": [{"aid": a.aid, "label": a.label,
+                     "category": a.category, "fw": a.fw} for a in _r.ACTIONS],
+        "effects": list(lighting.EFFECTS),
+        "accent": omarchy.keyboard_accent(),
+    }
+    print(_json.dumps(doc))
+    return 0
+
+
 def cmd_keycap(args) -> int:
     from omakeyfig import keycaps as _k
     if args.clear:
@@ -156,6 +219,8 @@ def build_parser() -> argparse.ArgumentParser:
     w = sub.add_parser("write-map", help="Write a keymap to the keyboard")
     w.add_argument("--pid", default=hex(PID_S70))
     w.add_argument("--profile", default=None)
+    w.add_argument("--mapping-file", default=None,
+                   help="JSON file with {slot: fw} (or {mappings: {...}}) merged over defaults")
     w.add_argument("--dry-run", action="store_true")
     w.add_argument("--yes", action="store_true")
     w.set_defaults(fn=cmd_write_map)
@@ -183,6 +248,9 @@ def build_parser() -> argparse.ArgumentParser:
     kc.add_argument("label", nargs="?", default=None, help="what the cap reads (omit with --clear)")
     kc.add_argument("--clear", action="store_true")
     kc.set_defaults(fn=cmd_keycap)
+    ex = sub.add_parser("export", help="JSON dump for alternative frontends")
+    ex.add_argument("--pid", default=hex(PID_S70))
+    ex.set_defaults(fn=cmd_export)
     lp = sub.add_parser("tui", help="Open the Textual TUI")
     lp.set_defaults(fn=cmd_tui)
     return ap

@@ -257,3 +257,21 @@ def test_profiles_save_apply_delete_mocked():
             assert "tui-test-tmp" not in app._profile_names
             profiles.profiles_dir().joinpath("tui-test-tmp.json").unlink(missing_ok=True)
     _run(scenario())
+
+
+def test_export_json_contract():
+    import json
+    from omakeyfig import cli as _cli
+    import io
+    from contextlib import redirect_stdout
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert _cli.main(["export", "--pid", "0x220"]) == 0
+    d = json.loads(buf.getvalue())
+    assert set(d) == {"pid", "n_keys", "devices", "rows", "defaults",
+                      "actions", "effects", "accent"}
+    assert sum(len(r) for r in d["rows"]) == 74
+    assert len(d["actions"]) == 103 and len(d["effects"]) == 21
+    q = next(c for r in d["rows"] for c in r if c["slot"] == 14)
+    assert q["label"] == "Q" and q["char"] == "q" and "q" in q["names"]
+    assert d["defaults"]["14"] == 0x1400
