@@ -156,6 +156,13 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
 ## Remap UI (omakeyfig/remap.py + RemapScreen in app.py)
 - Catalog: 103 actions mirroring KludgeKnight KEY_MAP + macro combos;
   covers 100% of firmware codes on the factory board (assert in tests).
+- Label views (keyboard_widget: tester/key `label_view`, `bind_labels`):
+  caps = keycap text, slots = firmware number, binds = resolved action via
+  `app.board_binds()` (base+pending). Fn/F-shift legends override all three
+  while active. View button cycles caps->slots->binds and relabels itself.
+- 80-column fit: button rows split in two (tester/lighting); stepper
+  buttons need `min-width` override (Textual default min-width:16 ignores
+  `width`). Regression coverage: flush-row geometry + x<=80 spot checks.
 - Board cursor: click or arrows/hjkl (`move_cursor` snaps to nearest
   x-center across rows); selection paints with the theme `selection` color.
 - Filter: Input.Changed rebuilds the action ListView; items carry NO ids

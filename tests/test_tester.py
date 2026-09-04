@@ -104,11 +104,10 @@ def test_lighting_screen_preview_no_hardware():
             # Steppers clamp 0..10.
             assert app.light_b == 5
             plus = app.query_one("#btn-b-plus", Button)
-            plus.scroll_visible()
-            await pilot.pause()
-            await pilot.pause()
-            await pilot.click("#btn-b-plus")
-            await pilot.pause()
+            plus.focus()
+            await pilot.pause(0.4)
+            await pilot.press("enter")
+            await pilot.pause(0.4)
             assert app.light_b == 6
     _run(scenario())
 
@@ -181,4 +180,35 @@ def test_fshift_toggle_views():
             board.set_fn_view(False)
             board.set_fshift_view(False)
             assert board.by_slot[13].shown_label == "1"
+    _run(scenario())
+
+
+def test_view_toggle_cycles_binds():
+    """View button cycles caps -> slots -> binds on the tester board."""
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = await _open_tester(app)
+            for _ in range(5):
+                await pilot.press("down")
+            await pilot.press("enter")
+            await pilot.pause()
+            board = app.query_one("#kb", KeyboardTester)
+            assert board.by_slot[14].shown_label == "Q"
+            from textual.widgets import Button
+            view = app.query_one("#btn-view", Button)
+            view.scroll_visible()
+            await pilot.pause(0.4)
+            await pilot.click("#btn-view")
+            await pilot.pause(0.4)
+            assert board.by_slot[14].shown_label == "14"
+            assert board.by_slot[1].shown_label == "1"
+            await pilot.click("#btn-view")
+            await pilot.pause(0.4)
+            # binds view: factory+customs map (M1=Esc custom, Q=Q)
+            assert board.by_slot[1].shown_label == "Esc"
+            assert board.by_slot[14].shown_label == "Q"
+            await pilot.click("#btn-view")
+            await pilot.pause(0.4)
+            assert board.by_slot[14].shown_label == "Q"  # back to caps
     _run(scenario())

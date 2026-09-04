@@ -88,3 +88,25 @@ def test_keywidget_uses_keycap(tmp_path, monkeypatch):
     kd = next(k for k in load_layout(0x0220) if k.slot == 14)
     w = KeyWidget(kd, 5)
     assert w.keycap_label == "ESC" and w.base_label == "Q"
+
+
+def test_label_views_cycle():
+    from omakeyfig.keyboard_widget import KeyWidget
+    from omakeyfig.layouts import load_layout
+    kd = next(k for k in load_layout(0x0220) if k.slot == 14)
+    w = KeyWidget(kd, 5)
+    assert w.shown_label == "Q"  # caps default
+    w.set_label_view("slots")
+    assert w.shown_label == "14"
+    w.set_label_view("binds", "Volume Up")
+    assert w.shown_label == "Volume Up"
+    w.set_label_view("binds")  # keeps previous bind label
+    assert w.shown_label == "Volume Up"
+    w.set_label_view("caps")
+    assert w.shown_label == "Q"
+    # Fn view overrides label views (firmware facts win)
+    w.set_label_view("slots")
+    w.set_fn_view(True)
+    assert w.shown_label == "?"  # Q has no Fn legend
+    w.set_fn_view(False)
+    assert w.shown_label == "14"  # back to slots

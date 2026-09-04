@@ -56,7 +56,10 @@ omakeyfig tui                     # Textual TUI
   Ins, Pause, End, Brt±, Spd◀▶; unknowns show `?`); the **F-Shift** toggle
   mirrors the board's Fn+LeftCtrl mode (number row as F1–F12, +Fn for media
   legends). Board labels follow `keycaps.toml` if you swap physical caps
-  (`omakeyfig keycap <slot> <label>`).
+  (`omakeyfig keycap <slot> <label>`). The **View** toggle cycles what each
+  key shows — **caps** (keycap text) → **slots** (firmware slot numbers, for
+  talking about keys precisely) → **binds** (current firmware action) — so
+  slots vs caps vs binds are always one click apart.
 - **Remap**: cursor the visual board (click, arrows, or `hjkl`), type to
   filter the 103-action catalog (`/`-style live filter), Enter to assign,
   `u` to undo, `?` for the binding overlay, `Ctrl+S` to review the diff and

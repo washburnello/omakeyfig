@@ -199,8 +199,18 @@ class KeyWidget(Static):
         self.shown_label = self.keycap_label
         self.fn_view = False
         self.fshift_view = False
+        # Label view: "caps" (keycap text) | "slots" (firmware slot #) | "binds" (firmware action).
+        self.label_view = "caps"
+        self.bind_label: str | None = None
         self.styles.width = cells
         self.update(self.keycap_label)
+
+    def set_label_view(self, mode: str, bind_label: str | None = None) -> None:
+        if mode in ("caps", "slots", "binds"):
+            self.label_view = mode
+        if bind_label is not None:
+            self.bind_label = bind_label
+        self.refresh_label()
 
     def refresh_label(self) -> None:
         if self.fn_view:
@@ -220,8 +230,13 @@ class KeyWidget(Static):
             self.shown_label = FSHIFT_KEYS[self.slot]
             self.update(f"[bold]{self.shown_label}[/bold]")
             return
-        self.shown_label = self.keycap_label
-        self.update(self.keycap_label)
+        if self.label_view == "slots":
+            self.shown_label = str(self.slot)
+        elif self.label_view == "binds":
+            self.shown_label = self.bind_label or "?"
+        else:
+            self.shown_label = self.keycap_label
+        self.update(self.shown_label)
 
     def set_fn_view(self, on: bool) -> None:
         self.fn_view = on
@@ -260,6 +275,8 @@ class KeyboardTester(Vertical):
         self.led_mode = "Off"
         self.fn_view = False
         self.fshift_view = False
+        self.label_view = "caps"
+        self.bind_labels: dict[int, str] = {}
         self.by_slot: dict[int, KeyWidget] = {}
         self.click_mode = "flash"  # or "select" for the remap screen
         self.selected: int | None = None
@@ -322,6 +339,24 @@ class KeyboardTester(Vertical):
         self.fshift_view = on
         for w in self.by_slot.values():
             w.set_fshift_view(on)
+
+    # -- label views: caps | slots | binds --------------------------------------
+    LABEL_VIEWS = ("caps", "slots", "binds")
+
+    def set_label_view(self, mode: str, bind_labels: dict[int, str] | None = None) -> None:
+        if mode in self.LABEL_VIEWS:
+            self.label_view = mode
+        if bind_labels is not None:
+            self.bind_labels = bind_labels
+        for slot, w in self.by_slot.items():
+            w.set_label_view(self.label_view, self.bind_labels.get(slot))
+
+    def cycle_label_view(self, bind_labels: dict[int, str] | None = None) -> str:
+        if bind_labels is not None:
+            self.bind_labels = bind_labels
+        nxt = self.LABEL_VIEWS[(self.LABEL_VIEWS.index(self.label_view) + 1) % 3]
+        self.set_label_view(nxt)
+        return nxt
 
     # -- cursor selection (remap screen) ---------------------------------------
     def _center(self, kd: KeyDef) -> float:

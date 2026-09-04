@@ -77,6 +77,7 @@ class RemapScreen(VerticalScroll):
         with Horizontal():
             yield Button("Fn", id="btn-fn")
             yield Button("F-Shift", id="btn-fshift")
+            yield Button("View: caps", id="btn-view")
         with Horizontal():
             yield Label("Selected ")
             yield Static("none", id="remap-sel")
@@ -150,6 +151,8 @@ class TesterScreen(VerticalScroll):
         with Horizontal():
             yield Button("Fn", id="btn-fn")
             yield Button("F-Shift", id="btn-fshift")
+            yield Button("View: caps", id="btn-view")
+        with Horizontal():
             yield Button("Clear", id="btn-clear")
             yield Button("Back", id="btn-back")
         yield RichLog(id="keylog", highlight=True, max_lines=200)
@@ -186,6 +189,8 @@ class LightingScreen(VerticalScroll):
         with Horizontal():
             yield Button("Fn", id="btn-fn")
             yield Button("F-Shift", id="btn-fshift")
+            yield Button("View: caps", id="btn-view")
+        with Horizontal():
             yield Button("Push to keyboard", id="btn-push")
             yield Button("Back", id="btn-back")
         yield Static("", id="light-status")
@@ -208,8 +213,8 @@ class OmakeyfigApp(App):
     #main { padding: 1 2; }
     .panel-title { text-style: bold; color: $accent; margin-bottom: 1; }
     .stepper Label { width: 12; }
-    .stepper Static { width: 14; }
-    .stepper Button { width: 6; }
+    .stepper Static { width: 4; }
+    .stepper Button { width: 5; min-width: 5; }
     #led-effect { width: 1fr; }
     #led-color { width: 12; }
     """
@@ -411,6 +416,23 @@ class OmakeyfigApp(App):
         self._refresh_profile_list()
         status.update(f"Deleted {name}.")
 
+    def board_binds(self) -> dict[int, str]:
+        """slot -> action label for the binds view (base + remap pending)."""
+        self._init_remap_base()
+        full = dict(self.remap_base)
+        full.update(self.remap_pending)
+        return {slot: remap.label_for_fw(fw) for slot, fw in full.items()}
+
+    def refresh_board_binds(self) -> None:
+        if self._screen not in ("tester", "remap", "lighting"):
+            return
+        try:
+            board = self.query_one("#kb", KeyboardTester)
+        except Exception:
+            return
+        if board.label_view == "binds":
+            board.set_label_view("binds", self.board_binds())
+
     # -- remap ---------------------------------------------------------------
     def _init_remap_base(self) -> None:
         if self.remap_base:
@@ -456,6 +478,7 @@ class OmakeyfigApp(App):
         diff.clear()
         for line in self.remap_diff_lines():
             diff.write(line)
+        self.refresh_board_binds()
 
     def remap_filter_actions(self, query: str) -> None:
         try:
@@ -848,6 +871,14 @@ class OmakeyfigApp(App):
                 return
             board.set_fn_view(not board.fn_view)
             event.button.variant = "success" if board.fn_view else "default"
+            return
+        if bid == "btn-view":
+            try:
+                board = self.query_one("#kb", KeyboardTester)
+            except Exception:
+                return
+            mode = board.cycle_label_view(self.board_binds())
+            event.button.label = f"View: {mode}"
             return
         if bid == "btn-fshift":
             try:
