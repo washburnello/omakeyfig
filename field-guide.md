@@ -50,8 +50,11 @@ be read back. Consequences:
   Ctrl/Shift/Alt/Win = `0x010000/020000/040000/080000`; right mods =
   `0x100000/.../0x800000`; Fn = `0xb000`; media = `0x01000000 | consumer`
   (VolUp `0x010000e9`, calculator `0x01000192`); S70 macros are Ctrl combos
-  (M1=Ctrl+A `0x010400`, M2=Ctrl+C `0x010600`, M3=Ctrl+V `0x011900`,
-  M4=Ctrl+X `0x011b00`, M5=Ctrl+S `0x011600`).
+  by slot: slot 1 (cap M5) = Ctrl+A `0x010400`, slot 2 (M4) = Ctrl+C
+  `0x010600`, slot 3 (M3) = Ctrl+V `0x011900`, slot 4 (M2) = Ctrl+X
+  `0x011b00`, slot 5 (M1) = Ctrl+S `0x011600`. The macro column prints
+  M5..M1 top-to-bottom; an early version of this repo had it backwards
+  (see past bug 7).
 - **Slots are sparse, 1..101.** Always key mappings by the KB.ini slot
   (8th field), never by list position. `n_keys = max(slot)+1` (102 for S70,
   fits the 146-slot capacity). Unused slots encode as 0, like KludgeKnight.
@@ -106,20 +109,39 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
   (sub-rows were rejected: they double the 15-line board to 30).
 - Unknown legends are completed empirically: open the tester, hold physical
   Fn, press keys, read what the OS receives. User-confirmed so far (Sep 2026,
-  from the user's own layout diagram): Fn+`=PtSc NOT confirmed (user will
-  wire PrtSc via base remap if wanted); Fn+[=Home, Fn+]=ScrollLock,
+  from the user's own layout diagram): Fn+`=PtSc left UNKNOWN on purpose
+  (user will wire PrtSc via base remap); Fn+[=Home, Fn+]=ScrollLock,
   Fn+\=lighting Style, Fn+N=hue cycle. FN-LCK is the user's name for the
   Fn+LeftCtrl F-shift chord itself, not a separate combo.
+- Fn legends render as slim non-outlined sub-rows UNDER each key row
+  (LegendWidget, CSS-toggled `.show-fn`), never as label swaps — this is
+  the user's ASCII-art layout verbatim. Base labels always stay put.
 
 ## Keycap layer (display only — omakeyfig/keycaps.py)
-
 - The user swaps physical keycaps. `~/.config/omakeyfig/keycaps.toml`
   maps slot -> label shown on the board. Firmware matching, remap logic,
   and profiles NEVER use keycap labels — only slots.
 - KeyWidget shows `keycap_label`; `base_label` (firmware function) stays
   available for status lines. CLI: `omakeyfig keycap <slot> <label>` and
-  `omakeyfig keycap <slot> --clear`. A full keycap-editor UI is parked
-  until the user pastes their ORIGINAL (pre-swap) layout.
+  `omakeyfig keycap <slot> --clear`. Pre-filled Sep 2026 from the user's
+  custom diagram: slot 1 = ESC, slot 7 = backtick, slot 97 = M5.
+- Board geometry targets modern monitors, NOT 80-col terminals
+  (explicit user call): PX_PER_CELL = 7 (roomy keys, horizontal scroll on
+  narrow terms). Do not re-tighten for minimal layouts.
+
+## Split spacebar physics (tester honesty)
+
+- Both halves emit the same HID code at factory (Space 0x2C00), so the OS
+  fundamentally cannot tell which half was pressed. `match_candidates`
+  matches events against current BINDS first, labels second, and returns
+  every candidate as (slot, bind, via).
+- Tester log shows all candidates: `space -> slot 35 [Space] |
+  slot 53 [Space]` plus an explicit "OS can't tell them apart" note when
+  binds are identical. A right-half remap (e.g. to Enter) makes halves
+  distinguishable again — the log then shows bind vs label provenance.
+- Same candidate logic powers Go? No — Go tester still matches labels
+  only (export `names`/`char`). Port match_candidates if the Go tester
+  needs bind-awareness.
 - Workaround for "Fn+PgUp should be PgUp": OS-level remap of the Pause key
   (e.g. keyd/Hyprland maps Pause -> PgUp). Mention, don't implement here.
 
@@ -152,6 +174,11 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
    via sysfs parent dir, not string matching on enumerate paths.
 6. Textual Pilot tests: Button swallows re-presses inside its active-effect
    window (~0.2s). Use `await pilot.pause(0.4)` around button activations.
+7. Macro column order: physical caps run M5..M1 TOP-to-bottom (slots 1..5).
+   An early version labeled them M1..M5 top-down (primed by KludgeKnight
+   naming, which the user then echoed). Ground truth: the user's factory
+   diagram + an independent S70 report tying M1 to Ctrl+S = slot 5.
+   Display names follow physical caps; firmware codes never cared.
 
 ## Remap UI (omakeyfig/remap.py + RemapScreen in app.py)
 - Catalog: 103 actions mirroring KludgeKnight KEY_MAP + macro combos;

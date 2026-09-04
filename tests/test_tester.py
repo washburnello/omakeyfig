@@ -130,8 +130,8 @@ def test_led_mode_switch():
     _run(scenario())
 
 
-def test_fn_toggle_swaps_labels():
-    """Fn button swaps board labels to Fn legends and back."""
+def test_fn_toggle_shows_legend_rows():
+    """Fn button reveals sub-legend rows under each key row; base labels stay."""
     async def scenario():
         app = OmakeyfigApp()
         async with app.run_test() as pilot:
@@ -143,6 +143,8 @@ def test_fn_toggle_swaps_labels():
             board = app.query_one("#kb", KeyboardTester)
             assert board.fn_view is False
             assert board.by_slot[13].shown_label == "1"
+            assert len(list(app.query("LegendWidget"))) == 74
+            assert all(row.display is False for row in app.query(".kb-legend"))
             from textual.widgets import Button
             fn = app.query_one("#btn-fn", Button)
             fn.focus()
@@ -150,12 +152,16 @@ def test_fn_toggle_swaps_labels():
             await pilot.press("enter")
             await pilot.pause(0.4)
             assert board.fn_view is True
-            assert board.by_slot[13].shown_label == "F1"
-            assert board.by_slot[14].shown_label == "?"
+            assert board.by_slot[13].shown_label == "1"  # base label untouched
+            by_slot_leg = {leg.slot: leg for leg in app.query("LegendWidget")}
+            assert by_slot_leg[13].legend == "F1"
+            assert by_slot_leg[14].legend == ""
+            assert by_slot_leg[99].legend == "Pause"
+            assert all(row.display is not False for row in app.query(".kb-legend"))
             await pilot.press("enter")
             await pilot.pause(0.4)
             assert board.fn_view is False
-            assert board.by_slot[13].shown_label == "1"
+            assert all(row.display is False for row in app.query(".kb-legend"))
     _run(scenario())
 
 
@@ -174,11 +180,14 @@ def test_fshift_toggle_views():
             board.set_fshift_view(True)
             assert board.by_slot[13].shown_label == "F1"
             assert board.by_slot[14].shown_label == "Q"  # non-number row untouched
-            board.set_fn_view(True)
-            assert board.by_slot[13].shown_label == "MyPC"
-            assert board.by_slot[61].shown_label == "Play"
+            by_slot_leg = {leg.slot: leg for leg in app.query("LegendWidget")}
+            assert by_slot_leg[13].legend == "MyPC"  # fshift: Fn+number = media
+            assert by_slot_leg[61].legend == "Play"
+            assert by_slot_leg[14].legend == ""  # Q: no legend either way
+            board.set_fn_view(True)  # legend rows only affect visibility
             board.set_fn_view(False)
             board.set_fshift_view(False)
+            assert by_slot_leg[13].legend == "F1"  # back to plain Fn legend
             assert board.by_slot[13].shown_label == "1"
     _run(scenario())
 
@@ -205,7 +214,7 @@ def test_view_toggle_cycles_binds():
             assert board.by_slot[1].shown_label == "1"
             await pilot.click("#btn-view")
             await pilot.pause(0.4)
-            # binds view: factory+customs map (M1=Esc custom, Q=Q)
+            # binds view: factory+customs map (slot 1=Esc custom, Q=Q)
             assert board.by_slot[1].shown_label == "Esc"
             assert board.by_slot[14].shown_label == "Q"
             await pilot.click("#btn-view")

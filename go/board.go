@@ -97,18 +97,9 @@ func itoa(i int) string {
 	return string(b[p:])
 }
 
-// labelFor resolves what a cell shows under the current view/fn state.
-// Plain text only (ANSI would break Lip Gloss width measurement).
-func labelFor(c Cell, view string, fnView, fshiftView bool, binds map[int]string) string {
-	if fnView {
-		if fshiftView && c.FshiftFn != nil {
-			return *c.FshiftFn
-		}
-		if c.Fn != nil {
-			return *c.Fn
-		}
-		return "?"
-	}
+// labelFor resolves what a cell shows under the current view.
+// Fn legends render as sub-rows (see renderBoard), never as label swaps.
+func labelFor(c Cell, view string, fshiftView bool, binds map[int]string) string {
 	if fshiftView && c.Fshift != nil {
 		return *c.Fshift
 	}
@@ -130,6 +121,7 @@ func renderBoard(th theme, rows [][]Cell, view string, fnView, fshiftView bool,
 	var sb strings.Builder
 	for _, row := range rows {
 		var lines [3]string
+		var legend strings.Builder
 		cursor := 0
 		for _, c := range row {
 			gap := ""
@@ -146,7 +138,7 @@ func renderBoard(th theme, rows [][]Cell, view string, fnView, fshiftView bool,
 			}
 			block := zone.Mark(fmt.Sprintf("slot-%d", c.Slot),
 				st.Width(inner).Height(1).Render(
-					fit(labelFor(c, view, fnView, fshiftView, binds), inner)))
+					fit(labelFor(c, view, fshiftView, binds), inner)))
 			cell := strings.Split(block, "\n")
 			for len(cell) < 3 {
 				cell = append(cell, "")
@@ -154,10 +146,22 @@ func renderBoard(th theme, rows [][]Cell, view string, fnView, fshiftView bool,
 			for i := 0; i < 3; i++ {
 				lines[i] += gap + cell[i]
 			}
+			if fnView {
+				leg := ""
+				if fshiftView && c.FshiftFn != nil {
+					leg = *c.FshiftFn
+				} else if c.Fn != nil {
+					leg = *c.Fn
+				}
+				legend.WriteString(gap + th.legend.Width(c.Cells).Render(fit(leg, c.Cells)))
+			}
 			cursor = c.X + c.Cells
 		}
 		for i := 0; i < 3; i++ {
 			sb.WriteString(strings.TrimRight(lines[i], " ") + "\n")
+		}
+		if fnView {
+			sb.WriteString(strings.TrimRight(legend.String(), " ") + "\n")
 		}
 	}
 	return sb.String()
@@ -175,6 +179,7 @@ func fit(s string, w int) string {
 type theme struct {
 	key     lipgloss.Style
 	pressed lipgloss.Style
+	legend  lipgloss.Style
 	title   lipgloss.Style
 	help    lipgloss.Style
 	sel     lipgloss.Style
@@ -194,6 +199,7 @@ func defaultTheme() theme {
 	return theme{
 		key:     key,
 		pressed: pressed,
+		legend:  lipgloss.NewStyle().Faint(true).Align(lipgloss.Center),
 		title:   lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#faa968")),
 		help:    lipgloss.NewStyle().Foreground(lipgloss.Color("#8cbfb8")),
 		sel:     lipgloss.NewStyle().Reverse(true),

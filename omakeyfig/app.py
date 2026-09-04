@@ -98,7 +98,7 @@ class RemapScreen(VerticalScroll):
 class MacroScreen(VerticalScroll):
     """Macro combo builder for M1-M5 + K2: modifiers + base key -> firmware."""
 
-    SLOTS = [(1, "M1"), (2, "M2"), (3, "M3"), (4, "M4"), (5, "M5"), (97, "K2 (` key)")]
+    SLOTS = [(1, "M5"), (2, "M4"), (3, "M3"), (4, "M2"), (5, "M1"), (97, "K2 (` key)")]
 
     def compose(self) -> ComposeResult:
         yield Label("Macros — pick a slot, toggle modifiers, pick a base key", classes="panel-title")
@@ -694,19 +694,25 @@ class OmakeyfigApp(App):
         if self._screen != "tester":
             return
         try:
+            from omakeyfig.keyboard_widget import match_candidates
             cap = self.query_one("#capture", KeyCapture)
             log = self.query_one("#keylog", RichLog)
             board = self.query_one("#kb", KeyboardTester)
         except Exception:
             return
+        self._init_remap_base()
         shown = repr(character) if character else "—"
         cap.update(f"[bold]{key}[/bold]  char={shown}")
-        slots = find_slots(board.keys, key, character)
-        if slots:
-            board.mark_pressed(slots)
-            log.write(f"key={key} char={shown} -> slot(s) {slots}")
-        else:
+        cands = match_candidates(board.keys, dict(self.remap_base), key, character)
+        if not cands:
             log.write(f"key={key} char={shown} (no board match)")
+            return
+        board.mark_pressed([s for s, _, _ in cands])
+        parts = " | ".join(f"slot {s} [{b or '?'}]" for s, b, _ in cands)
+        log.write(f"key={key} char={shown} -> {parts}")
+        binds = {b for _, b, _ in cands if b}
+        if len(cands) > 1 and len(binds) == 1:
+            log.write("  ^ same output from multiple slots — the OS can't tell them apart")
 
     async def on_key(self, event) -> None:
         if self._screen == "tester" and event.key not in ("tab", "shift+tab"):

@@ -51,12 +51,15 @@ omakeyfig tui                     # Textual TUI
   S70. A visual board (physical arrangement from the S70 layout data) lights
   each pressed key white and logs the OS key event + firmware slot(s); both
   halves of the split spacebar light together, as do L/R modifier pairs.
-  **Clear** resets all indicators. Leave via **Back**. The **Fn** toggle
+  The log names every candidate slot with its bind (`space -> slot 35
+  [Space] | slot 53 [Space]`) and says so explicitly when the OS can't
+  tell halves apart. **Clear** resets all indicators. Leave via **Back**. The **Fn** toggle
   swaps labels to the Fn layer (F1–F12, Win/Mac, Home, ScrLk, Style, Hue,
   Ins, Pause, End, Brt±, Spd◀▶; unknowns show `?`); the **F-Shift** toggle
   mirrors the board's Fn+LeftCtrl mode (number row as F1–F12, +Fn for media
   legends). Board labels follow `keycaps.toml` if you swap physical caps
-  (`omakeyfig keycap <slot> <label>`). The **View** toggle cycles what each
+  (`omakeyfig keycap <slot> <label>`). Fn legends appear as slim
+  non-outlined sub-rows under each key row — base labels never move. The **View** toggle cycles what each
   key shows — **caps** (keycap text) → **slots** (firmware slot numbers, for
   talking about keys precisely) → **binds** (current firmware action) — so
   slots vs caps vs binds are always one click apart.

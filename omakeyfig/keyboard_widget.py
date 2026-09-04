@@ -21,7 +21,7 @@ from omakeyfig import omarchy
 from omakeyfig.keycodes import MACRO_VKS
 from omakeyfig.layouts import KeyDef
 
-PX_PER_CELL = 9
+PX_PER_CELL = 7  # roomy cells for modern monitors; narrow terminals scroll
 KEY_HEIGHT = 3
 
 # Fn-layer legends by firmware slot. Sources: user-verified (PgUp->Pause,
@@ -150,16 +150,66 @@ def cells_for(px_width: int) -> int:
 
 
 def find_slots(keys: list[KeyDef], key_name: str, character: str | None) -> list[int]:
-    """Map an OS key event to firmware slots."""
+    """Map an OS key event to firmware slots (label matching only)."""
+    return [s for s, _, _ in match_candidates(keys, None, key_name, character)]
+
+
+def match_candidates(keys: list[KeyDef], fw_of: dict[int, int] | None,
+                     key_name: str, character: str | None) -> list[tuple[int, str, str]]:
+    """Map an OS key event to [(slot, bind_label, via)].
+
+    `fw_of` maps slot -> current firmware code (the pushed base map).
+    Matches bind labels FIRST (what the slot actually sends), then physical
+    labels (what the cap says). Both halves of the split spacebar match a
+    space event when they share a bind — the OS genuinely cannot tell them
+    apart, and the caller should say so.
+    """
+    from omakeyfig.remap import label_for_fw
+
+    def bind(slot: int) -> str:
+        if fw_of is None or slot not in fw_of:
+            return ""
+        try:
+            return label_for_fw(fw_of[slot])
+        except Exception:
+            return ""
+
+    found: list[tuple[int, str, str]] = []
+    seen: set[int] = set()
+
+    def add(slot: int, via: str) -> None:
+        if slot not in seen:
+            seen.add(slot)
+            found.append((slot, bind(slot), via))
+
     if character and len(character) == 1:
-        ch = character.lower()
-        ch = SHIFTED.get(ch, ch)
-        hits = [k.slot for k in keys
-                if len(short_label(k)) == 1 and short_label(k).lower() == ch]
-        if hits:
-            return hits
+        ch = SHIFTED.get(character.lower(), character.lower())
+        for k in keys:
+            if k.slot in seen:
+                continue
+            b = bind(k.slot)
+            if b and len(b) == 1 and b.lower() == ch:
+                add(k.slot, "bind")
+        for k in keys:
+            if k.slot in seen:
+                continue
+            if len(short_label(k)) == 1 and short_label(k).lower() == ch:
+                add(k.slot, "label")
+        if found:
+            return found
     want = key_name.lower()
-    return [k.slot for k in keys if want in match_names(k)]
+    for k in keys:
+        if k.slot in seen:
+            continue
+        b = bind(k.slot)
+        if b and b.lower() == want:
+            add(k.slot, "bind")
+    for k in keys:
+        if k.slot in seen:
+            continue
+        if want in match_names(k):
+            add(k.slot, "label")
+    return found
 
 
 def _hex(rgb: tuple[float, float, float]) -> str:
@@ -176,6 +226,26 @@ class KeyCapture(Static, can_focus=True):
     bubbles up to the app handler (except app-level bindings)."""
 
     DEFAULT_CSS = "KeyCapture { height: 3; content-align: center middle; border: solid $primary; }"
+
+
+class LegendWidget(Static):
+    """Slim, non-outlined Fn legend cell shown under its key row."""
+
+    DEFAULT_CSS = "LegendWidget { height: 1; margin: 0; padding: 0; text-align: center; opacity: 0.65; }"
+
+    def __init__(self, kd: KeyDef, cells: int) -> None:
+        super().__init__("")
+        self.slot = kd.slot
+        self.legend = ""
+        self.styles.width = cells
+        self.set_legends(False)
+
+    def set_legends(self, fshift_view: bool) -> None:
+        if fshift_view:
+            self.legend = FSHIFT_FN_MEDIA.get(self.slot) or fn_legend(self.slot) or ""
+        else:
+            self.legend = fn_legend(self.slot) or ""
+        self.update(self.legend)
 
 
 class KeyWidget(Static):
@@ -197,7 +267,6 @@ class KeyWidget(Static):
         self.base_label = short_label(kd)
         self.keycap_label = display_label(kd.slot, self.base_label, keycaps)
         self.shown_label = self.keycap_label
-        self.fn_view = False
         self.fshift_view = False
         # Label view: "caps" (keycap text) | "slots" (firmware slot #) | "binds" (firmware action).
         self.label_view = "caps"
@@ -213,19 +282,6 @@ class KeyWidget(Static):
         self.refresh_label()
 
     def refresh_label(self) -> None:
-        if self.fn_view:
-            if self.fshift_view and self.slot in FSHIFT_FN_MEDIA:
-                self.shown_label = FSHIFT_FN_MEDIA[self.slot]
-                self.update(f"[bold]{self.shown_label}[/bold]")
-                return
-            legend = fn_legend(self.slot)
-            if legend is None:
-                self.shown_label = "?"
-                self.update("[dim]?[/dim]")
-            else:
-                self.shown_label = legend
-                self.update(f"[bold]{legend}[/bold]")
-            return
         if self.fshift_view and self.slot in FSHIFT_KEYS:
             self.shown_label = FSHIFT_KEYS[self.slot]
             self.update(f"[bold]{self.shown_label}[/bold]")
@@ -237,10 +293,6 @@ class KeyWidget(Static):
         else:
             self.shown_label = self.keycap_label
         self.update(self.shown_label)
-
-    def set_fn_view(self, on: bool) -> None:
-        self.fn_view = on
-        self.refresh_label()
 
     def set_fshift_view(self, on: bool) -> None:
         self.fshift_view = on
@@ -263,6 +315,8 @@ class KeyboardTester(Vertical):
     DEFAULT_CSS = """
     KeyboardTester { height: auto; overflow-x: auto; }
     KeyboardTester .kb-row { height: 3; margin: 0; padding: 0; }
+    KeyboardTester .kb-legend { height: 1; margin: 0; padding: 0; display: none; }
+    KeyboardTester.show-fn .kb-legend { display: block; }
     """
 
     LED_MODES = ["Off", "Static", "Breathing", "Rainbow"]
@@ -308,6 +362,19 @@ class KeyboardTester(Vertical):
                     self.by_slot[k.slot] = key
                     yield key
                     cursor += w
+            with Horizontal(classes="kb-legend"):
+                cursor = 0
+                for k in row:
+                    x1, _, x2, _ = k.rect
+                    off = round((x1 - min_x) / PX_PER_CELL)
+                    if off > cursor:
+                        gap = S("")
+                        gap.styles.width = off - cursor
+                        yield gap
+                        cursor = off
+                    w = cells_for(x2 - x1)
+                    yield LegendWidget(k, w)
+                    cursor += w
 
     def on_mount(self) -> None:
         self._timer = self.set_interval(0.1, self._tick)
@@ -332,13 +399,17 @@ class KeyboardTester(Vertical):
     # -- Fn-layer / F-shift views -----------------------------------------------
     def set_fn_view(self, on: bool) -> None:
         self.fn_view = on
-        for w in self.by_slot.values():
-            w.set_fn_view(on)
+        self.set_class(on, "show-fn")
 
     def set_fshift_view(self, on: bool) -> None:
         self.fshift_view = on
         for w in self.by_slot.values():
             w.set_fshift_view(on)
+        try:
+            for leg in self.query(LegendWidget):
+                leg.set_legends(on)
+        except Exception:
+            pass
 
     # -- label views: caps | slots | binds --------------------------------------
     LABEL_VIEWS = ("caps", "slots", "binds")

@@ -56,21 +56,30 @@ func eq(a, b []int) bool {
 
 func TestLabelFor(t *testing.T) {
 	c := Cell{Slot: 13, Label: "1", Cap: "1", Fn: strp("F1")}
-	if labelFor(c, "caps", false, false, nil) != "1" {
+	if labelFor(c, "caps", false, nil) != "1" {
 		t.Fatal("caps")
 	}
-	if labelFor(c, "slots", false, false, nil) != "13" {
+	if labelFor(c, "slots", false, nil) != "13" {
 		t.Fatal("slots")
 	}
-	if labelFor(c, "binds", false, false, map[int]string{13: "F1"}) != "F1" {
+	if labelFor(c, "binds", false, map[int]string{13: "F1"}) != "F1" {
 		t.Fatal("binds")
 	}
-	if labelFor(c, "caps", true, false, nil) != "F1" {
-		t.Fatal("fn legend")
+	// fn legends render as sub-rows, never as label swaps
+	if labelFor(c, "caps", false, nil) != "1" {
+		t.Fatal("base label stays under fn view")
 	}
-	q := Cell{Slot: 14, Cap: "Q"}
-	if labelFor(q, "caps", true, false, nil) != "?" {
-		t.Fatal("unknown fn should be ?")
+}
+
+func TestLegendSubRows(t *testing.T) {
+	rows := testRows() // slot 13 has Fn F1
+	off := renderBoard(defaultTheme(), rows, "caps", false, false, nil, map[int]bool{})
+	on := renderBoard(defaultTheme(), rows, "caps", true, false, nil, map[int]bool{})
+	if strings.Count(on, "\n") != strings.Count(off, "\n")+1 {
+		t.Fatalf("fn view should add exactly one legend line:\n%s", on)
+	}
+	if !strings.Contains(on, "F1") {
+		t.Fatalf("legend line missing F1:\n%s", on)
 	}
 }
 

@@ -70,9 +70,11 @@ _MEDIA = [
     (0x1002, "Brightness Down", "Media", 0x01000070),
 ]
 _MACROS = [
-    (0xD9, "M1 (Ctrl+A)", "Macros", 0x010400), (0xB9, "M2 (Ctrl+C)", "Macros", 0x010600),
-    (0xC6, "M3 (Ctrl+V)", "Macros", 0x011900), (0xB8, "M4 (Ctrl+X)", "Macros", 0x011B00),
-    (0xC7, "M5 (Ctrl+S)", "Macros", 0x011600),
+    (0xD9, "Select All (Ctrl+A)", "Macros", 0x010400),
+    (0xB9, "Copy (Ctrl+C)", "Macros", 0x010600),
+    (0xC6, "Paste (Ctrl+V)", "Macros", 0x011900),
+    (0xB8, "Cut (Ctrl+X)", "Macros", 0x011B00),
+    (0xC7, "Save (Ctrl+S)", "Macros", 0x011600),
 ]
 
 ACTIONS: list[Action] = [Action(*t) for group in

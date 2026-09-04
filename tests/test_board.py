@@ -19,7 +19,8 @@ def test_rows_and_key_count():
 def test_short_labels():
     by_slot = {k.slot: k for k in s70()}
     assert short_label(by_slot[14]) == "Q"
-    assert short_label(by_slot[1]) == "M1"
+    assert short_label(by_slot[1]) == "M5"  # macro col prints M5..M1 top-down
+    assert short_label(by_slot[5]) == "M1"
     assert short_label(by_slot[35]) == "Space"
 
 
@@ -104,9 +105,38 @@ def test_label_views_cycle():
     assert w.shown_label == "Volume Up"
     w.set_label_view("caps")
     assert w.shown_label == "Q"
-    # Fn view overrides label views (firmware facts win)
-    w.set_label_view("slots")
-    w.set_fn_view(True)
-    assert w.shown_label == "?"  # Q has no Fn legend
-    w.set_fn_view(False)
-    assert w.shown_label == "14"  # back to slots
+
+
+def test_legend_widget_resolution():
+    from omakeyfig.keyboard_widget import LegendWidget
+    from omakeyfig.layouts import load_layout
+    keys = {k.slot: k for k in load_layout(0x0220)}
+    assert LegendWidget(keys[13], 5).legend == "F1"
+    assert LegendWidget(keys[14], 5).legend == ""
+    assert LegendWidget(keys[99], 5).legend == "Pause"
+    w = LegendWidget(keys[13], 5)
+    w.set_legends(True)  # fshift: Fn+number row = media
+    assert w.legend == "MyPC"
+    w.set_legends(False)
+    assert w.legend == "F1"
+
+
+def test_match_candidates_binds_first():
+    from omakeyfig.keyboard_widget import match_candidates
+    from omakeyfig.layouts import load_layout
+    keys = load_layout(0x0220)
+    base = {35: 0x2C00, 53: 0x2C00}  # both halves send Space
+    # space event: both halves, same bind
+    cands = match_candidates(keys, base, "space", " ")
+    slots = sorted(s for s, _, _ in cands)
+    assert slots == [35, 53]
+    assert {b for _, b, _ in cands} == {"Space"}
+    # right half remapped to Enter: 'enter' matches bind (53) + label (93)
+    base[53] = 0x2800
+    cands = match_candidates(keys, base, "enter", None)
+    got = {s: v for s, _, v in cands}
+    assert got[53] == "bind" and got[93] == "label"
+    # plain Q press still resolves by label when binds match factory
+    fw_q = 0x1400
+    cands = match_candidates(keys, {14: fw_q}, "q", "q")
+    assert cands[0][0] == 14

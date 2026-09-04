@@ -60,7 +60,12 @@ VK_TO_HID: dict[int, int] = {
 #   M4/cut  = Ctrl+X, M5/save = Ctrl+S.
 MACRO_FW = {0xD9: 0x010400, 0xB9: 0x010600, 0xC6: 0x011900,
             0xB8: 0x011B00, 0xC7: 0x011600}
-MACRO_VKS = {0xD9: "M1", 0xB9: "M2", 0xC6: "M3", 0xB8: "M4", 0xC7: "M5"}
+# Physical macro column runs M5..M1 TOP to BOTTOM (slots 1..5), i.e. the
+# printed cap on slot 1 reads M5. (Early versions of this file had it
+# backwards; the user's factory layout + an independent S70 report of
+# "M1 = Ctrl+S" = slot 5 settled it. Firmware codes are per-VK facts and
+# never changed — only these display names flipped.)
+MACRO_VKS = {0xD9: "M5", 0xB9: "M4", 0xC6: "M3", 0xB8: "M2", 0xC7: "M1"}
 
 
 def vk_to_firmware_code(vk: int) -> int:
