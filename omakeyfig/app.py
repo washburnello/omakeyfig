@@ -4,15 +4,91 @@ from __future__ import annotations
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Label, ListItem, ListView, RichLog, Select, Static
 
-from omakeyfig import hid_layer, lighting, omarchy
+from omakeyfig import codec, hid_layer, lighting, omarchy, remap
 from omakeyfig.keyboard_widget import KeyboardTester, KeyCapture, find_slots
 from omakeyfig.layouts import load_layout
 
 # Full RGB effect names get a live board preview approximated as one of the
 # four preview modes the tester widget can paint.
 PREVIEW_FOR_EFFECT = {"Steady": "Static", "Breathing": "Breathing", "Rainbow": "Rainbow"}
+
+
+class HelpOverlay(ModalScreen):
+    """`?` keybinding overlay, charm-style."""
+
+    BINDINGS = [
+        ("h j k l / arrows", "move board cursor"),
+        ("enter", "jump to action filter"),
+        ("type", "filter actions"),
+        ("enter on action", "assign to selected key"),
+        ("u", "undo last assignment"),
+        ("ctrl+s", "review + push to keyboard"),
+        ("?", "this overlay"),
+        ("esc", "close overlay / back"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="help-box"):
+            yield Label("Keybindings", classes="panel-title")
+            for keys, what in self.BINDINGS:
+                yield Label(f"{keys}  —  {what}")
+            yield Button("Close", id="btn-help-close")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-help-close":
+            self.dismiss()
+
+
+class ConfirmPush(ModalScreen[bool]):
+    """Explicit confirm gate: no hardware write without saying yes here."""
+
+    def __init__(self, lines: list[str]) -> None:
+        super().__init__()
+        self.lines = lines
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-box"):
+            yield Label("Push to keyboard?", classes="panel-title")
+            yield Label(f"{len(self.lines)} changed key(s). Firmware is write-only: "
+                        "this overwrites the board map.")
+            for line in self.lines[:20]:
+                yield Label(line)
+            if len(self.lines) > 20:
+                yield Label(f"… and {len(self.lines) - 20} more")
+            with Horizontal():
+                yield Button("Write to keyboard", id="btn-confirm-yes", variant="error")
+                yield Button("Cancel", id="btn-confirm-no")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "btn-confirm-yes")
+
+
+class RemapScreen(VerticalScroll):
+    """Visual remap editor: cursor the board, filter actions, assign, push."""
+
+    def compose(self) -> ComposeResult:
+        yield Label("Remap — cursor a key, pick an action (? for help)", classes="panel-title")
+        board = KeyboardTester(load_layout(0x0220), omarchy.keyboard_accent())
+        board.click_mode = "select"
+        yield board
+        with Horizontal():
+            yield Label("Selected ")
+            yield Static("none", id="remap-sel")
+        with Horizontal():
+            yield Label("Filter ")
+            yield Input(placeholder="/ type to filter actions", id="remap-filter")
+        yield ListView(*[ListItem(Label(f"{a.label}  [{a.category}]"))
+                         for a in remap.ACTIONS], id="remap-actions")
+        yield Label("Pending changes", classes="panel-title")
+        yield RichLog(id="remap-diff", highlight=True, max_lines=200)
+        with Horizontal():
+            yield Button("Undo (u)", id="btn-undo")
+            yield Button("Push (ctrl+s)", id="btn-push-remap")
+            yield Button("Back", id="btn-back")
+        yield Static("", id="remap-status")
 
 
 class TesterScreen(VerticalScroll):
@@ -89,18 +165,138 @@ class OmakeyfigApp(App):
     SECTIONS = ["Devices", "Remap", "Lighting", "Macros M1-M5", "Profiles", "Key tester"]
     SECTION_HELP = {
         "Devices": "USB status of the S70. Use the Device status button.",
-        "Remap": "Visual remap editor lands here next.",
         "Macros M1-M5": "Factory: M1=Ctrl+A M2=Ctrl+C M3=Ctrl+V M4=Ctrl+X M5=Ctrl+S.",
         "Profiles": "For now: `omakeyfig save-profile <name>` / `write-map --profile`.",
     }
 
+    # -- remap ---------------------------------------------------------------
+    def _init_remap_base(self) -> None:
+        from omakeyfig.cli import _default_mappings
+        base, n = _default_mappings(0x0220)
+        self.remap_base = base
+        self.remap_n_keys = n
+        self.remap_pending = {}
+        self.remap_history = []
+
+    def remap_effective(self, slot: int) -> int:
+        return self.remap_pending.get(slot, self.remap_base.get(slot, 0))
+
+    def remap_diff_lines(self) -> list[str]:
+        lines = []
+        for slot in sorted(self.remap_pending):
+            old, new = self.remap_base.get(slot, 0), self.remap_pending[slot]
+            lines.append(f"slot {slot}: {remap.label_for_fw(old)} -> {remap.label_for_fw(new)}")
+        return lines
+
+    def refresh_remap_ui(self) -> None:
+        try:
+            board = self.query_one("#kb", KeyboardTester)
+            sel = self.query_one("#remap-sel", Static)
+            diff = self.query_one("#remap-diff", RichLog)
+        except Exception:
+            return
+        if board.selected is None:
+            sel.update("none")
+        else:
+            cur = self.remap_effective(board.selected)
+            sel.update(f"slot {board.selected}: {remap.label_for_fw(cur)}")
+        diff.clear()
+        for line in self.remap_diff_lines():
+            diff.write(line)
+
+    def remap_filter_actions(self, query: str) -> None:
+        try:
+            lv = self.query_one("#remap-actions", ListView)
+        except Exception:
+            return
+        lv.clear()
+        self._action_aids = [a.aid for a in remap.search(query)]
+        for a in remap.search(query):
+            lv.append(ListItem(Label(f"{a.label}  [{a.category}]")))
+
+    def remap_assign(self, aid: int) -> None:
+        try:
+            board = self.query_one("#kb", KeyboardTester)
+            status = self.query_one("#remap-status", Static)
+        except Exception:
+            return
+        if board.selected is None:
+            status.update("Cursor a board key first (click, arrows, or hjkl).")
+            return
+        slot = board.selected
+        self.remap_history.append((slot, self.remap_pending.get(slot)))
+        self.remap_pending[slot] = remap.fw_for(aid)
+        if self.remap_pending[slot] == self.remap_base.get(slot, 0):
+            del self.remap_pending[slot]
+        self.refresh_remap_ui()
+        status.update(f"slot {slot} -> {remap.BY_ID[aid].label} "
+                      f"({len(self.remap_pending)} pending)")
+
+    def remap_undo(self) -> None:
+        if not self.remap_history:
+            return
+        slot, prev = self.remap_history.pop()
+        if prev is None:
+            self.remap_pending.pop(slot, None)
+        else:
+            self.remap_pending[slot] = prev
+        if self.remap_pending.get(slot) == self.remap_base.get(slot, 0):
+            self.remap_pending.pop(slot, None)
+        self.refresh_remap_ui()
+
+    def remap_push(self) -> None:
+        if self._screen != "remap":
+            return
+        lines = self.remap_diff_lines()
+        if not lines:
+            try:
+                self.query_one("#remap-status", Static).update("Nothing to push.")
+            except Exception:
+                pass
+            return
+
+        def _after(ok: bool | None) -> None:
+            if not ok:
+                return
+            full = dict(self.remap_base)
+            full.update(self.remap_pending)
+            try:
+                buffers = codec.encode_keymap(full, self.remap_n_keys)
+                dev = hid_layer.RKDevice()
+                try:
+                    dev.write_feature_buffers(buffers)
+                finally:
+                    dev.close()
+            except Exception as e:
+                try:
+                    self.query_one("#remap-status", Static).update(f"Push failed: {e}")
+                except Exception:
+                    pass
+                return
+            self.remap_base = full
+            self.remap_pending = {}
+            self.remap_history = []
+            self.refresh_remap_ui()
+            try:
+                self.query_one("#remap-status", Static).update(
+                    f"Pushed {len(lines)} change(s) to the keyboard.")
+            except Exception:
+                pass
+
+        self.push_screen(ConfirmPush(lines), _after)
+
     def __init__(self) -> None:
         super().__init__()
         self._status = "Connect the S70 via USB, then pick a section."
-        self._screen: str | None = None  # None | "tester" | "lighting"
+        self._screen: str | None = None  # None | "tester" | "lighting" | "remap"
         self.light_b = 5
         self.light_s = 5
         self.light_z = 5
+        self.remap_base: dict[int, int] = {}
+        self.remap_n_keys = 102
+        self.remap_pending: dict[int, int] = {}
+        self.remap_history: list[tuple[int, int | None]] = []  # (slot, previous or None)
+        self._action_aids: list[int] = [a.aid for a in remap.ACTIONS]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -117,6 +313,11 @@ class OmakeyfigApp(App):
                     yield Button("Dry-run write", id="btn-dry")
         yield Footer()
 
+    BINDINGS = [("ctrl+s", "push remap", "remap_push_binding")]
+
+    def action_remap_push_binding(self) -> None:
+        self.remap_push()
+
     def show_home(self) -> None:
         self._screen = None
         main = self.query_one("#main", Vertical)
@@ -131,19 +332,33 @@ class OmakeyfigApp(App):
 
     def show_screen(self, name: str) -> None:
         self._screen = name
+        self._action_aids = [a.aid for a in remap.ACTIONS]
         main = self.query_one("#main", Vertical)
         main.remove_children()
-        main.mount(LightingScreen() if name == "lighting" else TesterScreen())
-        if name == "tester":
+        if name == "lighting":
+            main.mount(LightingScreen())
+        elif name == "remap":
+            self._init_remap_base()
+            main.mount(RemapScreen())
+        else:
+            main.mount(TesterScreen())
             self.set_timer(0.05, lambda: self.query_one("#capture", KeyCapture).focus())
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if self._screen == "remap" and event.control.id == "remap-actions":
+            idx = event.control.index
+            aids = getattr(self, "_action_aids", [a.aid for a in remap.ACTIONS])
+            if idx is not None and 0 <= idx < len(aids):
+                self.remap_assign(aids[idx])
+            return
         idx = event.control.index
         label = self.SECTIONS[idx] if idx is not None and 0 <= idx < len(self.SECTIONS) else ""
         if label == "Key tester":
             self.show_screen("tester")
         elif label == "Lighting":
             self.show_screen("lighting")
+        elif label == "Remap":
+            self.show_screen("remap")
         else:
             if self._screen is not None:
                 self.show_home()
@@ -175,6 +390,40 @@ class OmakeyfigApp(App):
     async def on_key(self, event) -> None:
         if self._screen == "tester" and event.key not in ("tab", "shift+tab"):
             self.record_key(event.key, event.character)
+            return
+        if self._screen == "remap":
+            await self.remap_key(event)
+
+    async def remap_key(self, event) -> None:
+        focused = self.focused
+        in_filter = getattr(focused, "id", None) == "remap-filter"
+        key = event.key
+        if key in ("?", "question_mark") or getattr(event, "character", None) == "?":
+            self.push_screen(HelpOverlay())
+            return
+        if in_filter:
+            if key == "escape":
+                self.query_one("#kb", KeyboardTester).focus() if False else None
+            return
+        try:
+            board = self.query_one("#kb", KeyboardTester)
+        except Exception:
+            return
+        moves = {"left": (-1, 0), "h": (-1, 0), "right": (1, 0), "l": (1, 0),
+                 "up": (0, -1), "k": (0, -1), "down": (0, 1), "j": (0, 1)}
+        if key in moves:
+            dx, dy = moves[key]
+            board.move_cursor(dx, dy)
+            self.refresh_remap_ui()
+            event.prevent_default()
+        elif key == "enter":
+            try:
+                self.query_one("#remap-filter", Input).focus()
+            except Exception:
+                pass
+            event.prevent_default()
+        elif key == "u":
+            self.remap_undo()
 
     # -- lighting ------------------------------------------------------------
     def refresh_light_labels(self) -> None:
@@ -200,6 +449,9 @@ class OmakeyfigApp(App):
             self.preview_lighting()
 
     def on_input_changed(self, event: Input.Changed) -> None:
+        if self._screen == "remap" and event.input.id == "remap-filter":
+            self.remap_filter_actions(event.value)
+            return
         if event.input.id == "led-color" and self._screen == "lighting":
             v = event.value.strip()
             if len(v) == 7 and v.startswith("#"):
@@ -254,6 +506,12 @@ class OmakeyfigApp(App):
                 self.query_one("#kb", KeyboardTester).clear_pressed()
             except Exception:
                 pass
+            return
+        if bid == "btn-undo":
+            self.remap_undo()
+            return
+        if bid == "btn-push-remap":
+            self.remap_push()
             return
         if bid == "btn-push":
             self.push_lighting()

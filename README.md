@@ -51,6 +51,11 @@ omakeyfig tui                     # Textual TUI
   each pressed key white and logs the OS key event + firmware slot(s); both
   halves of the split spacebar light together, as do L/R modifier pairs.
   **Clear** resets all indicators. Leave via **Back**.
+- **Remap**: cursor the visual board (click, arrows, or `hjkl`), type to
+  filter the 103-action catalog (`/`-style live filter), Enter to assign,
+  `u` to undo, `?` for the binding overlay, `Ctrl+S` to review the diff and
+  confirm the write. Every push is gated behind an explicit confirm dialog
+  listing each changed slot — nothing touches the board by accident.
 - **Lighting**: effect picker (all 21 RGB effects), hex color (defaults to
   your Omarchy accent), brightness / speed / sleep steppers, a live board
   preview, and **Push to keyboard** to send it to the real board.

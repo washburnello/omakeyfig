@@ -123,6 +123,22 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
 6. Textual Pilot tests: Button swallows re-presses inside its active-effect
    window (~0.2s). Use `await pilot.pause(0.4)` around button activations.
 
+## Remap UI (omakeyfig/remap.py + RemapScreen in app.py)
+
+- Catalog: 103 actions mirroring KludgeKnight KEY_MAP + macro combos;
+  covers 100% of firmware codes on the factory board (assert in tests).
+- Board cursor: click or arrows/hjkl (`move_cursor` snaps to nearest
+  x-center across rows); selection paints with the theme `selection` color.
+- Filter: Input.Changed rebuilds the action ListView; items carry NO ids
+  (duplicate-id registration errors) — selection resolves via index into
+  `_action_aids`. Reset `_action_aids` on every `show_screen`.
+- Push flow: diff lines -> ConfirmPush modal -> encode base+pending ->
+  RKDevice write -> base=full, pending/history cleared. Every push needs the
+  modal "Write to keyboard" click. Tests mock RKDevice (no hardware).
+- Pilot quirks: `?` arrives as key `question_mark` (check character too);
+  modal Button Enter is unreliable — click `#btn-confirm-yes` instead;
+  button re-press needs `pause(0.4)` (see bug 6).
+
 ## Omarchy integration
 
 - Theme colors: `~/.local/state/omarchy/current/theme/colors.toml`;

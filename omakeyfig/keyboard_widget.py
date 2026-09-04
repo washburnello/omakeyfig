@@ -196,7 +196,10 @@ class KeyWidget(Static):
         while parent is not None and not isinstance(parent, KeyboardTester):
             parent = parent.parent
         if parent is not None:
-            parent.flash_slot(self.slot)
+            if parent.click_mode == "select":
+                parent.select_slot(self.slot)
+            else:
+                parent.flash_slot(self.slot)
 
 
 class KeyboardTester(Vertical):
@@ -217,15 +220,20 @@ class KeyboardTester(Vertical):
         self.led_mode = "Off"
         self.fn_view = False
         self.by_slot: dict[int, KeyWidget] = {}
+        self.click_mode = "flash"  # or "select" for the remap screen
+        self.selected: int | None = None
+        self.rows: list[list[KeyDef]] = []
         self._t0 = time.monotonic()
         self._timer = None
         colors = omarchy.theme_colors()
         self.base_bg = colors.get("lighter_background", "#0a2540")
         self.base_fg = colors.get("foreground", "#f6dcac")
+        self.sel_bg = colors.get("selection", "#134e5a")
 
     def compose(self):
         from textual.widgets import Static as S
-        for row in cluster_rows(self.keys):
+        self.rows = cluster_rows(self.keys)
+        for row in self.rows:
             min_x = min(k.rect[0] for k in row)
             with Horizontal(classes="kb-row"):
                 cursor = 0
@@ -269,6 +277,36 @@ class KeyboardTester(Vertical):
         for w in self.by_slot.values():
             w.set_fn_view(on)
 
+    # -- cursor selection (remap screen) ---------------------------------------
+    def _center(self, kd: KeyDef) -> float:
+        return (kd.rect[0] + kd.rect[2]) / 2
+
+    def select_slot(self, slot: int | None) -> None:
+        self.selected = slot
+        self._paint()
+
+    def move_cursor(self, dx: int, dy: int) -> int | None:
+        """Move the cursor across physical rows; returns the new slot."""
+        if not self.rows:
+            return None
+        if self.selected is None:
+            row_i, col_i = (0 if dy >= 0 else len(self.rows) - 1), 0
+            self.select_slot(self.rows[row_i][col_i].slot)
+            return self.selected
+        cur = next(((ri, ci) for ri, row in enumerate(self.rows)
+                    for ci, k in enumerate(row) if k.slot == self.selected), None)
+        if cur is None:
+            return None
+        ri, ci = cur
+        if dy == 0:
+            ci = max(0, min(len(self.rows[ri]) - 1, ci + dx))
+        else:
+            ri = max(0, min(len(self.rows) - 1, ri + dy))
+            x = self._center(self.rows[cur[0]][cur[1]])
+            ci = min(range(len(self.rows[ri])), key=lambda c: abs(self._center(self.rows[ri][c]) - x))
+        self.select_slot(self.rows[ri][ci].slot)
+        return self.selected
+
     # -- LED preview ---------------------------------------------------------
     def set_led_mode(self, mode: str) -> None:
         if mode in self.LED_MODES:
@@ -300,6 +338,9 @@ class KeyboardTester(Vertical):
             if k.slot in self.pressed:
                 w.styles.background = "#ffffff"
                 w.styles.color = "#000000"
+            elif k.slot == self.selected:
+                w.styles.background = self.sel_bg
+                w.styles.color = "#ffffff"
             elif self.led_mode == "Off":
                 w.styles.background = self.base_bg
                 w.styles.color = self.base_fg

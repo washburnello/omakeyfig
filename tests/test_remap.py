@@ -1,0 +1,142 @@
+import asyncio
+
+from textual.widgets import Input, ListView
+
+from omakeyfig import remap
+from omakeyfig.app import OmakeyfigApp
+from omakeyfig.keyboard_widget import KeyboardTester
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+async def _open_remap(app, pilot):
+    lv = app.query_one("#sections", ListView)
+    lv.focus()
+    await pilot.pause()
+    await pilot.press("down")  # Devices(0) -> Remap(1)
+    await pilot.press("enter")
+    await pilot.pause()
+    assert app._screen == "remap"
+
+
+def test_catalog_search():
+    assert len(remap.search("")) == len(remap.ACTIONS) == 103
+    vols = remap.search("vol")
+    assert {a.label for a in vols} == {"Volume Up", "Volume Down"}
+    assert remap.fw_for(0x51) == 0x1400  # Q
+    assert remap.label_for_fw(0x010000E9) == "Volume Up"
+
+
+def test_cursor_moves_physically():
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            await _open_remap(app, pilot)
+            board = app.query_one("#kb", KeyboardTester)
+            assert board.move_cursor(0, 0) == 1  # first key: M1
+            assert board.move_cursor(0, 1) == 2  # down into row 2
+            right = board.move_cursor(1, 0)
+            assert right is not None and right != 2
+            assert board.move_cursor(-100, 0) == board.rows[1][0].slot  # clamp
+    _run(scenario())
+
+
+def test_assign_undo_flow():
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            await _open_remap(app, pilot)
+            board = app.query_one("#kb", KeyboardTester)
+            board.select_slot(14)  # Q
+            app.refresh_remap_ui()
+            await pilot.pause()
+            app.remap_assign(0xAF)  # Volume Up
+            assert app.remap_pending == {14: 0x010000E9}
+            assert app.remap_diff_lines() == ["slot 14: Q -> Volume Up"]
+            app.remap_undo()
+            assert app.remap_pending == {}
+    _run(scenario())
+
+
+def test_filter_and_assign_via_ui():
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            await _open_remap(app, pilot)
+            board = app.query_one("#kb", KeyboardTester)
+            board.select_slot(14)
+            app.refresh_remap_ui()
+            filt = app.query_one("#remap-filter", Input)
+            filt.focus()
+            await pilot.pause()
+            await pilot.press(*list("vol"))
+            await pilot.pause()
+            lv = app.query_one("#remap-actions", ListView)
+            texts = []
+            for item in lv.children:
+                try:
+                    lab = item.query_one("Label")
+                    texts.append(str(getattr(lab, "content", None) or lab.render_line(0).text))
+                except Exception:
+                    texts.append("")
+            assert any("Volume Up" in t for t in texts), texts
+            assert all("Volume" in t or "Brightness" in t for t in texts), texts
+    _run(scenario())
+
+
+def test_push_confirm_writes_and_clears():
+    """Confirm modal gates the write; mocked device receives encoded map."""
+    import omakeyfig.app as appmod
+    from omakeyfig import codec
+    from textual.widgets import Button
+
+    captured: dict = {}
+
+    class FakeDev:
+        def write_feature_buffers(self, bufs, dry_run=False):
+            captured["bufs"] = bufs
+            return bufs
+
+        def close(self):
+            pass
+
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            await _open_remap(app, pilot)
+            board = app.query_one("#kb", KeyboardTester)
+            board.select_slot(14)
+            app.remap_assign(0xAF)  # Q -> Volume Up
+            assert app.remap_pending == {14: 0x010000E9}
+            orig = appmod.hid_layer.RKDevice
+            appmod.hid_layer.RKDevice = lambda *a, **k: FakeDev()
+            try:
+                app.remap_push()
+                await pilot.pause()
+                assert app.screen_stack[-1].__class__.__name__ == "ConfirmPush"
+                yes = app.screen_stack[-1].query_one("#btn-confirm-yes", Button)
+                yes.scroll_visible()
+                await pilot.pause(0.4)
+                await pilot.click("#btn-confirm-yes")
+                await pilot.pause(0.4)
+            finally:
+                appmod.hid_layer.RKDevice = orig
+            assert "bufs" in captured, "device write never happened"
+            assert codec.decode_keymap(captured["bufs"], app.remap_n_keys)[14] == 0x010000E9
+            assert app.remap_pending == {}  # cleared after push
+    _run(scenario())
+
+
+def test_help_overlay():
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            await _open_remap(app, pilot)
+            await pilot.press("question_mark")
+            await pilot.pause()
+            assert app.screen_stack[-1].__class__.__name__ == "HelpOverlay"
+            await pilot.press("escape")
+            await pilot.pause()
+    _run(scenario())
