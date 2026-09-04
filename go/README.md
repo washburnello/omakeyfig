@@ -14,12 +14,13 @@ go build -o omakeyfig-go .
 OMAKEYFIG_BACKEND=/path/to/omakeyfig ./omakeyfig-go   # or omakeyfig on PATH
 ```
 
-## Status (spike)
+## Status
 
 Working: menu, devices, key tester (press-to-light, caps/slots/binds,
 Fn + F-shift views, `?` overlay, persistent help bar), lighting
-(effect cycle, steppers, push). Remap/macros/profiles live in the Python
-TUI for now — the `--mapping-file` flag already unblocks a Go remap.
+(effect cycle, steppers, push), remap (board cursor, live filter,
+assign, diff, undo, confirm-gated push via `write-map --mapping-file`).
+Macros/profiles live in the Python TUI for now.
 
 ## Tests
 

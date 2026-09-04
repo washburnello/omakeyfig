@@ -15,6 +15,7 @@ const (
 	sDevices
 	sTester
 	sLighting
+	sRemap
 )
 
 var views = []string{"caps", "slots", "binds"}
@@ -42,6 +43,9 @@ type model struct {
 	spd   int
 	slp   int
 	status string
+
+	// remap state (nil until first visit)
+	remap *remapSt
 
 	showHelp bool
 }
@@ -82,6 +86,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		return m, nil
+	case pushedMsg:
+		if m.remap != nil {
+			m.remap.confirm = false
+			if msg.err != nil {
+				m.remap.status = "push failed: " + msg.err.Error()
+			} else {
+				m.remap.status = "pushed to keyboard"
+				m.remap.base = m.remap.fullMap()
+				m.remap.pending = map[int]int{}
+				m.remap.history = nil
+			}
+		}
+		return m, nil
 	case tea.KeyMsg:
 		return m.updateKey(msg)
 	}
@@ -94,8 +111,15 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showHelp = false
 		return m, nil
 	}
+	if k == "ctrl+c" {
+		return m, tea.Quit
+	}
+	// remap filter focus eats everything except ctrl+c (esc exits filter)
+	if m.screen == sRemap && m.remap != nil && m.remap.focusFilt {
+		return m.updateRemap(k)
+	}
 	switch k {
-	case "q", "ctrl+c":
+	case "q":
 		return m, tea.Quit
 	case "?":
 		m.showHelp = true
@@ -113,11 +137,13 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateTester(k)
 	case sLighting:
 		return m.updateLighting(k, msg)
+	case sRemap:
+		return m.updateRemap(k)
 	}
 	return m, nil
 }
 
-var menuItems = []string{"Devices", "Key tester", "Lighting", "(Remap in Python TUI)", "(Macros in Python TUI)", "(Profiles in Python TUI)"}
+var menuItems = []string{"Devices", "Key tester", "Lighting", "Remap", "(Macros in Python TUI)", "(Profiles in Python TUI)"}
 
 func (m model) updateMenu(k string) (tea.Model, tea.Cmd) {
 	switch k {
@@ -133,6 +159,11 @@ func (m model) updateMenu(k string) (tea.Model, tea.Cmd) {
 			m.screen = sTester
 		case 2:
 			m.screen = sLighting
+		case 3:
+			if m.remap == nil {
+				m.remap = newRemap(m.doc)
+			}
+			m.screen = sRemap
 		}
 	case "esc":
 		return m, tea.Quit
@@ -231,6 +262,8 @@ func (m model) View() string {
 		b.WriteString(m.viewTester())
 	case sLighting:
 		b.WriteString(m.viewLighting())
+	case sRemap:
+		b.WriteString(m.viewRemap())
 	}
 	b.WriteString("\n" + m.th.help.Render(m.helpBar()) + "\n")
 	if m.showHelp {
@@ -254,6 +287,8 @@ func (m model) helpBar() string {
 		return "press keys to light them · tab view · F1 fn · F2 f-shift · C clear · esc menu"
 	case sLighting:
 		return "←→ effect · 1/2 bri · 3/4 spd · 5/6 sleep · enter push · esc menu"
+	case sRemap:
+		return "hjkl move · enter filter · type+enter assign · u undo · ctrl+s push · esc menu"
 	default:
 		return "esc back · ? help · q quit"
 	}
@@ -310,6 +345,9 @@ var helpText = `omakeyfig-go keybindings
            F1 fn layer · F2 f-shift · C clears · esc menu
   lighting ←→ change effect · 1/2 brightness · 3/4 speed
            5/6 sleep · enter pushes to keyboard · esc menu
+  remap    hjkl/arrows move cursor · enter focuses filter
+           type to filter · enter assigns · u undo
+           ctrl+s reviews + confirms the push · esc menu
 
   Writes always go through the Python backend.`
 
