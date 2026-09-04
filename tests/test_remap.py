@@ -140,3 +140,120 @@ def test_help_overlay():
             await pilot.press("escape")
             await pilot.pause()
     _run(scenario())
+
+
+def test_macro_combo_encoding():
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = app.query_one("#sections", ListView)
+            lv.focus()
+            await pilot.pause()
+            await pilot.press("down", "down", "down", "enter")
+            await pilot.pause()
+            assert app._screen == "macros"
+            app.macro_slot = 2
+            app.macro_mods = {"m-lctrl", "m-lshift"}
+            app.macro_base = 0x54  # T
+            assert app.macro_combo_fw() == 0x010000 | 0x020000 | 0x1700
+            app.macro_mods = set()
+            app.macro_base = 0xB3  # Play/Pause, no mods
+            assert app.macro_combo_fw() == 0x010000CD
+    _run(scenario())
+
+
+def test_macro_assign_push_mocked():
+    import omakeyfig.app as appmod
+    from omakeyfig import codec
+    from textual.widgets import Button
+    captured: dict = {}
+
+    class FakeDev:
+        def write_feature_buffers(self, bufs, dry_run=False):
+            captured["bufs"] = bufs
+            return bufs
+
+        def close(self):
+            pass
+
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = app.query_one("#sections", ListView)
+            lv.focus()
+            await pilot.pause()
+            await pilot.press("down", "down", "down", "enter")
+            await pilot.pause()
+            app.macro_slot = 2
+            app.macro_mods = {"m-lctrl"}
+            app.macro_base = 0x43  # C -> Ctrl+C
+            orig = appmod.hid_layer.RKDevice
+            appmod.hid_layer.RKDevice = lambda *a, **k: FakeDev()
+            try:
+                app.macro_assign()
+                await pilot.pause()
+                assert app.screen_stack[-1].__class__.__name__ == "ConfirmPush"
+                yes = app.screen_stack[-1].query_one("#btn-confirm-yes", Button)
+                yes.scroll_visible()
+                await pilot.pause(0.4)
+                await pilot.click("#btn-confirm-yes")
+                await pilot.pause(0.4)
+            finally:
+                appmod.hid_layer.RKDevice = orig
+            assert codec.decode_keymap(captured["bufs"], 102)[2] == 0x010600
+    _run(scenario())
+
+
+def test_profiles_save_apply_delete_mocked():
+    import omakeyfig.app as appmod
+    from omakeyfig import codec, profiles
+    from textual.widgets import Button, Input
+    captured: dict = {}
+
+    class FakeDev:
+        def write_feature_buffers(self, bufs, dry_run=False):
+            captured["bufs"] = bufs
+            return bufs
+
+        def close(self):
+            pass
+
+    async def scenario():
+        app = OmakeyfigApp()
+        async with app.run_test() as pilot:
+            lv = app.query_one("#sections", ListView)
+            lv.focus()
+            await pilot.pause()
+            await pilot.press("down", "down", "down", "down", "enter")
+            await pilot.pause()
+            assert app._screen == "profiles"
+            assert "washburnello-restore" in app._profile_names
+            # save a new profile from the effective map
+            name_in = app.query_one("#profile-name", Input)
+            name_in.value = "tui-test-tmp"
+            app.profile_save()
+            await pilot.pause()
+            assert "tui-test-tmp" in app._profile_names
+            # select it and apply with mocked device
+            app.profile_selected = "tui-test-tmp"
+            orig = appmod.hid_layer.RKDevice
+            appmod.hid_layer.RKDevice = lambda *a, **k: FakeDev()
+            try:
+                app.profile_apply()
+                await pilot.pause()
+                assert app.screen_stack[-1].__class__.__name__ == "ConfirmPush"
+                yes = app.screen_stack[-1].query_one("#btn-confirm-yes", Button)
+                yes.scroll_visible()
+                await pilot.pause(0.4)
+                await pilot.click("#btn-confirm-yes")
+                await pilot.pause(0.4)
+            finally:
+                appmod.hid_layer.RKDevice = orig
+            assert "bufs" in captured
+            assert codec.decode_keymap(captured["bufs"], 102)[14] == 0x1400  # Q intact
+            # delete it
+            app.profile_selected = "tui-test-tmp"
+            app.profile_delete()
+            assert "tui-test-tmp" not in app._profile_names
+            profiles.profiles_dir().joinpath("tui-test-tmp.json").unlink(missing_ok=True)
+    _run(scenario())

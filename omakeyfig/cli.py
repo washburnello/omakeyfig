@@ -31,7 +31,9 @@ def _default_mappings(pid: int) -> tuple[dict[int, int], int]:
     """Defaults keyed by firmware SLOT (the 8th KB.ini field), NOT position.
 
     Slots are sparse (S70 uses 1..101); unused slots encode as 0, exactly
-    like KludgeKnight's full-buffer fill.
+    like KludgeKnight's full-buffer fill. Applies the user's verified
+    customs from Profile1.rkf on top of factory (see rkf.py + field-guide):
+    Esc->`, PgUp->Home, PgDn->End, M1->Esc.
     """
     keys = load_layout(pid)
     n_keys = max(k.slot for k in keys) + 1
@@ -41,6 +43,13 @@ def _default_mappings(pid: int) -> tuple[dict[int, int], int]:
             out[k.slot] = vk_to_firmware_code(k.vk)
         except KeyError:
             out[k.slot] = 0
+    if pid in (0x0220, 0x0229, 0x01D9, 0x00D7):
+        customs = {7: 0xC0, 99: 0x24, 100: 0x23, 1: 0x1B}  # rkf-verified
+        for slot, vk in customs.items():
+            try:
+                out[slot] = vk_to_firmware_code(vk)
+            except KeyError:
+                pass
     return out, n_keys
 
 
@@ -105,6 +114,12 @@ def cmd_light(args) -> int:
     return 0
 
 
+def cmd_list_profiles(args) -> int:
+    for name in profiles.list_profiles():
+        print(name)
+    return 0
+
+
 def cmd_save_profile(args) -> int:
     pid = int(args.pid, 0)
     mappings, _ = _default_mappings(pid)
@@ -149,6 +164,8 @@ def build_parser() -> argparse.ArgumentParser:
     sv.add_argument("name")
     sv.add_argument("--pid", default=hex(PID_S70))
     sv.set_defaults(fn=cmd_save_profile)
+    lp = sub.add_parser("list-profiles", help="List saved profiles")
+    lp.set_defaults(fn=cmd_list_profiles)
     lp = sub.add_parser("tui", help="Open the Textual TUI")
     lp.set_defaults(fn=cmd_tui)
     return ap

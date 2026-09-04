@@ -34,7 +34,8 @@ sudo cp udev/60-rk.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rul
 
 ```bash
 omakeyfig status                  # list connected RK boards (expect 258a:0220 for the S70)
-omakeyfig tui                     # Textual TUI (includes the Key tester screen)
+omakeyfig tui                     # Textual TUI (all screens)
+omakeyfig list-profiles           # saved profiles
 omakeyfig write-map --dry-run     # validate codec without touching hardware
 omakeyfig save-profile default    # snapshot defaults
 omakeyfig write-map --profile default --yes   # real write (backs up first in later versions)
@@ -57,8 +58,16 @@ omakeyfig tui                     # Textual TUI
 - **Remap**: cursor the visual board (click, arrows, or `hjkl`), type to
   filter the 103-action catalog (`/`-style live filter), Enter to assign,
   `u` to undo, `?` for the binding overlay, `Ctrl+S` to review the diff and
-  confirm the write. Every push is gated behind an explicit confirm dialog
-  listing each changed slot — nothing touches the board by accident.
+  confirm the write. Base map = factory + your verified customs
+  (Esc→`, PgUp→Home, PgDn→End, M1→Esc). Every push is gated behind an
+  explicit confirm dialog — nothing touches the board by accident.
+- **Macros**: M1–M5 + K2 combo builder — toggle LCtrl/LShift/LAlt/LWin,
+  pick a base key (letters, F-keys, media...), Assign + Push with the same
+  confirm gate. Combo encoding is `modifier-bits | HID<<8`, matching the
+  official app's Ctrl-combo macro codes.
+- **Profiles**: save the current map under a name, apply any saved profile
+  (confirm-gated), delete, refresh. Also via CLI: `save-profile`,
+  `list-profiles`, `write-map --profile`.
 - **Lighting**: effect picker (all 21 RGB effects), hex color (defaults to
   your Omarchy accent), brightness / speed / sleep steppers, a live board
   preview, and **Push to keyboard** to send it to the real board.
@@ -76,10 +85,13 @@ sed "s|^Exec=.*|Exec=$HOME/.local/bin/omakeyfig tui|" desktop/omakeyfig.desktop 
 
 ## Omarchy extras
 
-- Auto-sync lighting on theme change (opt-in): set `theme_follow = true` in `~/.config/omakeyfig/config.toml`,
-  then `omarchy hook install theme-set hooks/theme-set.d/10-omakeyfig.sh`.
-- Bar widget: `omarchy plugin add https://github.com/washburnello/omakeyfig.git --path omarchy-plugin`
-  (left-click opens TUI, right-click applies theme color).
+- Theme hook **installed** (`theme-set.d/10-omakeyfig.sh`): set
+  `theme_follow = true` in `~/.config/omakeyfig/config.toml` and every
+  `omarchy theme set` pushes the new accent to the board. Default off.
+- Bar widget **installed and enabled** (`washburnello.omakeyfig`, first in
+  the right section): left-click opens the TUI, right-click applies the
+  theme accent. Remove via the bar settings; `shell.json.bak.omakeyfig`
+  backs up the pre-install layout.
 
 ## Safety
 

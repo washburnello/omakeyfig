@@ -141,7 +141,6 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
    window (~0.2s). Use `await pilot.pause(0.4)` around button activations.
 
 ## Remap UI (omakeyfig/remap.py + RemapScreen in app.py)
-
 - Catalog: 103 actions mirroring KludgeKnight KEY_MAP + macro combos;
   covers 100% of firmware codes on the factory board (assert in tests).
 - Board cursor: click or arrows/hjkl (`move_cursor` snaps to nearest
@@ -155,6 +154,36 @@ Slots K2 (slot 97), M2 (2), M3 (3), M4 (4), M5 (5). Raw bytes in
 - Pilot quirks: `?` arrives as key `question_mark` (check character too);
   modal Button Enter is unreliable — click `#btn-confirm-yes` instead;
   button re-press needs `pause(0.4)` (see bug 6).
+
+## Macros UI (MacroScreen in app.py)
+
+- Covers M1-M5 (slots 1-5) + K2 (slot 97). Combo encoding =
+  `modifier-bits | HID<<8`, which reproduces the official macro codes
+  (Ctrl+A `0x010400` etc.). Media bases allowed only with no modifiers.
+- Each Assign builds the FULL map (base + one slot) and pushes through
+  ConfirmPush immediately. Base = `_default_mappings` (factory + customs).
+- K2 judgement (Sep 2026): left at factory `` ` `` — user never said what
+  it does; candidate Esc. See todo.md #1.
+
+## Profiles (profiles.py + ProfileScreen)
+
+- Payload: `{pid, mappings: {slot: fw}, note?/source?}`. Apply path uses
+  `n = max(max(slot)+1, 102)`. After apply, remap base is REPLACED by the
+  profile map so further remap edits compose on top.
+- Remap base persists across screen visits within a session
+  (`_init_remap_base` inits once); Profiles Save snapshots base+pending.
+- `washburnello-restore` == `_default_mappings` output (verified zero-diff).
+
+## Omarchy install record (user machine, Sep 2026)
+
+- Hook installed: `~/.config/omarchy/hooks/theme-set.d/10-omakeyfig.sh`,
+  `theme_follow` default false.
+- Bar widget installed: `~/.config/omarchy/plugins/washburnello.omakeyfig/`,
+  added first in the bar right section. Backup:
+  `~/.config/omarchy/shell.json.bak.omakeyfig`. Shell lists it enabled,
+  no QML errors.
+- Menu entry: `~/.local/share/applications/omakeyfig.desktop`;
+  PATH shim: `~/.local/bin/omakeyfig` (-> repo venv python).
 
 ## Omarchy integration
 
